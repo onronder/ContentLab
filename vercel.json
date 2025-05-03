@@ -3,6 +3,7 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "version": 2,
   "headers": [
     {
       "source": "/(.*)",
