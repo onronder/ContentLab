@@ -1,0 +1,153 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { checkRateLimit, RateLimitResult } from "./lib/rate-limiter";
+
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  // Refresh the session if it exists
+  const { data } = await supabase.auth.getSession();
+
+  // Protected routes that require authentication
+  const protectedRoutes = [
+    "/admin",
+    "/data-management",
+    "/jobs",
+    "/reports",
+  ];
+
+  // API routes that need rate limiting
+  const apiRoutes = [
+    "/api/analyze",
+    "/api/reports",
+    "/api/jobs",
+    "/api/data",
+  ];
+
+  // Check if the route is protected and if the user is authenticated
+  const isProtectedRoute = protectedRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  );
+
+  // Check if route is an API route that needs rate limiting
+  const isApiRoute = apiRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  );
+
+  if (isProtectedRoute && !data.session) {
+    // Redirect to login page if user is not authenticated
+    const redirectUrl = new URL("/login", request.url);
+    redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Apply rate limiting for API routes
+  if (isApiRoute && data.session) {
+    // Get user info
+    const userId = data.session.user.id;
+    
+    // Get organization ID from request header or user profile
+    // For now, we'll use a placeholder since we need to implement a way to associate the user with an organization
+    let organizationId = request.headers.get("x-organization-id");
+    
+    if (!organizationId) {
+      // If organization ID is not in headers, fetch it from user's organization membership
+      const { data: orgData } = await supabase
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", userId)
+        .limit(1)
+        .single();
+      
+      organizationId = orgData?.organization_id;
+    }
+    
+    if (organizationId) {
+      // Check rate limits
+      const rateLimitResult = await checkRateLimit(
+        organizationId,
+        userId,
+        request.nextUrl.pathname
+      );
+      
+      // Add rate limit headers to response
+      response.headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', Math.floor(rateLimitResult.reset.getTime() / 1000).toString());
+      
+      // Return 429 if rate limited
+      if (rateLimitResult.exceeded) {
+        response.headers.set('Retry-After', Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString());
+        return new NextResponse(JSON.stringify({
+          error: 'Too Many Requests',
+          message: 'Rate limit exceeded. Please try again later.',
+          retryAfter: Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+        }), {
+          status: 429,
+          headers: response.headers
+        });
+      }
+    }
+  }
+
+  return response;
+}
+
+// Only run middleware on matching routes
+export const config = {
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
+    "/api/:path*", // Add API routes to matcher
+  ],
+}; 
