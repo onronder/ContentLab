@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { headers } from 'next/headers';
-import { getMemoryCache, setMemoryCache, withCache, CACHE_EXPIRY } from './cache';
+import { getRateLimiter, setCache, getCache, deleteCache } from './redis';
+import { CACHE_EXPIRY } from './cache';
 
 export interface RateLimitResult {
   success: boolean;
@@ -20,6 +21,38 @@ export interface QuotaCheckResult {
 }
 
 /**
+ * Gets the plan type string for rate limiting
+ * @param planId - The plan ID
+ * @returns Plan type string
+ */
+async function getPlanType(planId: string): Promise<'free' | 'starter' | 'pro' | 'enterprise' | 'custom'> {
+  const supabase = createClient();
+  
+  try {
+    const { data, error } = await supabase
+      .from('subscription_plans')
+      .select('name')
+      .eq('id', planId)
+      .single();
+      
+    if (error || !data) {
+      return 'free'; // Default to free plan on error
+    }
+    
+    // Check if it's one of our standard plans
+    if (['free', 'starter', 'pro', 'enterprise'].includes(data.name)) {
+      return data.name as 'free' | 'starter' | 'pro' | 'enterprise';
+    }
+    
+    // If it's a custom plan
+    return 'custom';
+  } catch (err) {
+    console.error('Error getting plan type:', err);
+    return 'free'; // Default to free plan on error
+  }
+}
+
+/**
  * Checks if a request is rate limited based on the organization and endpoint
  * @param organizationId - The organization ID
  * @param userId - The user ID
@@ -34,19 +67,19 @@ export async function checkRateLimit(
   const supabase = createClient();
   
   try {
-    // Rate limit checks should generally not be cached to ensure accurate limiting
-    const { data, error } = await supabase.rpc('record_rate_limit_request', {
-      p_organization_id: organizationId,
-      p_user_id: userId,
-      p_endpoint: endpoint
-    });
-    
-    if (error) {
-      console.error('Rate limit check error:', error);
-      // Default to allowing the request if there's an error checking
+    // Get organization's subscription plan
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('subscription_plan_id, custom_limits')
+      .eq('id', organizationId)
+      .single();
+      
+    if (orgError || !orgData) {
+      console.error('Error fetching organization:', orgError);
+      // Default to lowest limits
       return {
         success: false,
-        limit: 60, // Default limit
+        limit: 30, // Default limit (free plan)
         remaining: 1,
         reset: new Date(Date.now() + 60000), // Reset in 1 minute
         isLimited: false,
@@ -54,23 +87,54 @@ export async function checkRateLimit(
       };
     }
     
-    const result = data[0] || {};
+    // Get plan type for rate limiting
+    const planType = await getPlanType(orgData.subscription_plan_id);
+    
+    // Check for custom rate limit in organization settings
+    let customLimit = null;
+    if (orgData.custom_limits && orgData.custom_limits.rate_limit) {
+      customLimit = orgData.custom_limits.rate_limit;
+    }
+    
+    // Get the appropriate rate limiter
+    const limiter = getRateLimiter(planType);
+    
+    // Create a key for this specific organization and endpoint
+    const rateLimitKey = `${organizationId}:${endpoint}`;
+    
+    // Check the limit
+    const { success, limit, remaining, reset } = await limiter.limit(rateLimitKey);
+    
+    // Apply custom limit override if available
+    const actualLimit = customLimit || limit;
+    
+    // Also record in database for analytics (but don't block on this)
+    supabase.rpc('record_rate_limit_request', {
+      p_organization_id: organizationId,
+      p_user_id: userId,
+      p_endpoint: endpoint
+    }).then((res) => {
+      if (res.error) {
+        console.error('Failed to record rate limit request:', res.error);
+      }
+    });
+    
     return {
       success: true,
-      limit: result.limit_value || 60,
-      remaining: Math.max(0, (result.limit_value || 60) - (result.current_count || 0)),
-      reset: new Date(result.reset_time || Date.now() + 60000),
-      isLimited: !!result.is_rate_limited,
-      exceeded: !!result.is_rate_limited
+      limit: actualLimit,
+      remaining,
+      reset: new Date(reset),
+      isLimited: !success,
+      exceeded: !success
     };
   } catch (err) {
     console.error('Rate limit error:', err);
     // Default to allowing the request if there's an exception
     return {
       success: false,
-      limit: 60,
+      limit: 30, // Default limit (free plan)
       remaining: 1,
-      reset: new Date(Date.now() + 60000),
+      reset: new Date(Date.now() + 60000), // Reset in 1 minute
       isLimited: false,
       exceeded: false
     };
@@ -90,8 +154,8 @@ export async function checkQuota(
   // Use cache key that includes organization ID and quota type
   const cacheKey = `quota:${organizationId}:${quotaType}`;
   
-  // Check memory cache first with a short TTL (30 seconds)
-  const cachedResult = getMemoryCache<QuotaCheckResult>(cacheKey);
+  // Check Redis cache first with a short TTL (30 seconds)
+  const cachedResult = await getCache<QuotaCheckResult>(cacheKey);
   if (cachedResult) {
     return cachedResult;
   }
@@ -126,7 +190,7 @@ export async function checkQuota(
     
     // Cache the result for 30 seconds to reduce database load
     // Quota data doesn't change that frequently
-    setMemoryCache(cacheKey, quotaResult, 30 * 1000);
+    await setCache(cacheKey, quotaResult, 30);
     
     return quotaResult;
   } catch (err) {
@@ -147,42 +211,48 @@ export async function checkQuota(
  * @returns Subscription plan details
  */
 export async function getSubscriptionPlanDetails(organizationId: string) {
-  return withCache(
-    `org:${organizationId}:subscription`,
-    async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('organizations')
-        .select(`
-          subscription_plan_id,
-          subscription_plans (
-            id,
-            name,
-            display_name,
-            max_analyses_daily,
-            max_analyses_monthly,
-            max_competitor_urls,
-            max_api_requests_daily,
-            storage_limit_mb,
-            priority_queue
-          )
-        `)
-        .eq('id', organizationId)
-        .single();
-        
-      if (error || !data) {
-        throw new Error(`Failed to fetch subscription plan: ${error?.message || 'No data'}`);
-      }
+  const cacheKey = `org:${organizationId}:subscription`;
+  
+  // Try to get from cache first
+  const cachedData = await getCache(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+  
+  // If not in cache, fetch from database
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('organizations')
+      .select(`
+        subscription_plan_id,
+        subscription_plans (
+          id,
+          name,
+          display_name,
+          max_analyses_daily,
+          max_analyses_monthly,
+          max_competitor_urls,
+          max_api_requests_daily,
+          storage_limit_mb,
+          priority_queue
+        )
+      `)
+      .eq('id', organizationId)
+      .single();
       
-      return data.subscription_plans;
-    },
-    {
-      // Cache for 15 minutes in memory
-      memoryExpiryMs: CACHE_EXPIRY.LONG,
-      // Cache for 1 hour in persistent cache
-      persistentExpirySeconds: 3600
+    if (error || !data) {
+      throw new Error(`Failed to fetch subscription plan: ${error?.message || 'No data'}`);
     }
-  );
+    
+    // Cache for 15 minutes
+    await setCache(cacheKey, data.subscription_plans, 15 * 60);
+    
+    return data.subscription_plans;
+  } catch (error) {
+    console.error('Error fetching subscription details:', error);
+    throw error;
+  }
 }
 
 /**
@@ -213,12 +283,11 @@ export async function incrementUsage(
     
     // Clear cached quota information since it's now stale
     const quotaTypes = ['daily_analyses', 'monthly_analyses', 'competitor_urls', 'daily_api_requests'];
-    quotaTypes.forEach(type => {
+    for (const type of quotaTypes) {
       const cacheKey = `quota:${organizationId}:${type}`;
-      // Clear from memory cache to force a refresh on next check
-      // No need to worry about persistent cache as it will expire naturally
-      setMemoryCache(cacheKey, null, 0);
-    });
+      // Clear from cache to force a refresh on next check
+      await deleteCache(cacheKey);
+    }
     
     return !!data;
   } catch (err) {
@@ -248,7 +317,7 @@ export async function requestQuotaIncrease(
       p_organization_id: organizationId,
       p_request_type: requestType,
       p_requested_limit: requestedLimit,
-      p_reason: reason
+      p_reason: reason || ''
     });
     
     if (error) {
@@ -264,8 +333,8 @@ export async function requestQuotaIncrease(
 }
 
 /**
- * Get all documentation for rate limits and quotas
- * @param category - Documentation category
+ * Get documentation for a specific category
+ * @param category - The documentation category
  * @param publicOnly - Whether to return only public documentation
  * @returns Documentation items
  */
@@ -273,53 +342,61 @@ export async function getDocumentation(
   category: string,
   publicOnly: boolean = true
 ): Promise<any[]> {
-  return withCache(
-    `docs:${category}:${publicOnly ? 'public' : 'all'}`,
-    async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc('get_documentation', {
-        p_category: category,
-        p_public_only: publicOnly
-      });
-      
-      if (error) {
-        console.error('Documentation fetch error:', error);
-        return [];
-      }
-      
-      return data || [];
-    },
-    {
-      // Cache documentation for longer periods since it rarely changes
-      memoryExpiryMs: CACHE_EXPIRY.VERY_LONG,
-      persistentExpirySeconds: 24 * 60 * 60 // 24 hours
+  const cacheKey = `docs:${category}:${publicOnly ? 'public' : 'all'}`;
+  
+  // Try to get from cache first
+  const cachedData = await getCache<any[]>(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+  
+  // If not in cache, fetch from database
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('get_documentation', {
+      p_category: category,
+      p_public_only: publicOnly
+    });
+    
+    if (error) {
+      console.error('Documentation fetch error:', error);
+      return [];
     }
-  );
+    
+    const docs = JSON.parse(data || '[]');
+    
+    // Cache for longer period since documentation rarely changes
+    // 1 hour for public docs, 15 minutes for admin docs
+    const cacheTime = publicOnly ? 60 * 60 : 15 * 60;
+    await setCache(cacheKey, docs, cacheTime);
+    
+    return docs;
+  } catch (err) {
+    console.error('Documentation fetch error:', err);
+    return [];
+  }
 }
 
 /**
- * Adds rate limiting headers to a Next.js Response object
- * @param response - The Response object
- * @param rateLimitResult - The rate limit check result
- * @returns The Response with headers added
+ * Add rate limit headers to a response
+ * @param response - The response object
+ * @param rateLimitResult - Rate limit info
+ * @returns Updated response
  */
 export function addRateLimitHeaders(
   response: Response,
   rateLimitResult: RateLimitResult
 ): Response {
-  const headers = new Headers(response.headers);
-  
-  headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString());
-  headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
-  headers.set('X-RateLimit-Reset', Math.floor(rateLimitResult.reset.getTime() / 1000).toString());
+  response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+  response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  response.headers.set('X-RateLimit-Reset', String(Math.floor(rateLimitResult.reset.getTime() / 1000)));
   
   if (rateLimitResult.exceeded) {
-    headers.set('Retry-After', Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString());
+    response.headers.set(
+      'Retry-After', 
+      String(Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000))
+    );
   }
   
-  return new Response(response.body, {
-    status: rateLimitResult.exceeded ? 429 : response.status,
-    statusText: rateLimitResult.exceeded ? 'Too Many Requests' : response.statusText,
-    headers
-  });
+  return response;
 } 
