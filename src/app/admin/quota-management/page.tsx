@@ -23,11 +23,6 @@ interface FormattedQuotaRequest {
   reviewedAt: string | null;
 }
 
-// Define types for nested response structures
-interface RequestUser {
-  email: string | null;
-}
-
 export default async function QuotaManagementPage() {
   const supabase = createServerSupabaseClient();
   
