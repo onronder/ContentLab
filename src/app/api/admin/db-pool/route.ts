@@ -9,6 +9,19 @@ import {
   checkDatabaseExtensions
 } from '@/app/api/db-config';
 
+// Define cookie option type
+interface CookieOptions {
+  name: string;
+  value: string;
+  maxAge?: number;
+  domain?: string;
+  path?: string;
+  expires?: Date;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+}
+
 /**
  * GET handler - retrieve connection pool status and metrics
  */
@@ -24,11 +37,11 @@ export async function GET(request: NextRequest) {
           const cookie = cookieStore.get(name);
           return cookie?.value;
         },
-        async set(name: string, value: string, options: any) {
+        async set(name: string, value: string, options: CookieOptions) {
           const cookieStore = await cookies();
           cookieStore.set({ name, value, ...options });
         },
-        async remove(name: string, options: any) {
+        async remove(name: string, options: CookieOptions) {
           const cookieStore = await cookies();
           cookieStore.set({ name, value: '', ...options });
         },
@@ -96,11 +109,11 @@ export async function POST(request: NextRequest) {
           const cookie = cookieStore.get(name);
           return cookie?.value;
         },
-        async set(name: string, value: string, options: any) {
+        async set(name: string, value: string, options: CookieOptions) {
           const cookieStore = await cookies();
           cookieStore.set({ name, value, ...options });
         },
-        async remove(name: string, options: any) {
+        async remove(name: string, options: CookieOptions) {
           const cookieStore = await cookies();
           cookieStore.set({ name, value: '', ...options });
         },

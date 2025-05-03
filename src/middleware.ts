@@ -1,67 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { checkRateLimit, RateLimitResult } from "./lib/rate-limiter";
+import { checkRateLimit } from "./lib/rate-limiter";
 import { getRateLimiter } from './lib/redis';
-
-// In-memory store for rate limiting
-// Note: This will reset on server restart, but works for basic protection
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
-}
-
-const rateLimitStore: RateLimitStore = {};
-
-// Rate limit settings
-const RATE_LIMIT = {
-  // Higher limits for API endpoints that need more throughput
-  API: {
-    windowMs: 60 * 1000, // 1 minute
-    max: process.env.RATE_LIMIT_REQUESTS ? parseInt(process.env.RATE_LIMIT_REQUESTS) : 30,
-  },
-  // Lower limits for authentication endpoints to prevent brute force
-  AUTH: {
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 10,
-  },
-  // Very low limits for sensitive operations
-  SENSITIVE: {
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5,
-  }
-};
-
-// Helper to apply rate limiting
-function applyRateLimit(
-  req: NextRequest, 
-  limiterType: 'API' | 'AUTH' | 'SENSITIVE' = 'API'
-): { limited: boolean; resetTime?: number } {
-  // Get client identifier - prefer user ID if authenticated, fallback to IP
-  const ip = req.headers.get('x-forwarded-for') || 'unknown-ip';
-  const limiter = RATE_LIMIT[limiterType];
-  const identifier = `${ip}:${limiterType}`;
-  
-  const now = Date.now();
-  const rateData = rateLimitStore[identifier] || { count: 0, resetTime: now + limiter.windowMs };
-  
-  // Reset count if the time window has passed
-  if (now > rateData.resetTime) {
-    rateData.count = 0;
-    rateData.resetTime = now + limiter.windowMs;
-  }
-  
-  // Increment count and check if rate limited
-  rateData.count += 1;
-  rateLimitStore[identifier] = rateData;
-  
-  return {
-    limited: rateData.count > limiter.max,
-    resetTime: rateData.resetTime
-  };
-}
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({

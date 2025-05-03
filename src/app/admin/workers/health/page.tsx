@@ -5,11 +5,10 @@ import { useWorkerStats, useWorkerDetails, useWorkerHistory, triggerWorkerHealth
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
-import { RefreshCw, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { ResourceUsageChart } from "@/components/ResourceUsageChart";
 

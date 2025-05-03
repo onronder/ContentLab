@@ -1,6 +1,5 @@
 import React from 'react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 import { QuotaRequestList } from '@/components/admin/QuotaRequestList';
 
 export const metadata = {
@@ -33,7 +32,7 @@ export default async function QuotaManagementPage() {
     .order('created_at', { ascending: false });
   
   // Format the data for easier consumption by components
-  const formattedRequests = requests?.map((request: any) => ({
+  const formattedRequests = requests?.map((request: Record<string, any>) => ({
     id: request.id,
     organizationId: request.organization_id,
     organizationName: request.organizations?.name || 'Unknown Organization',

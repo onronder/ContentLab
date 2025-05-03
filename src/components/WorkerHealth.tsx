@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { formatDistance } from 'date-fns';
 import {
@@ -88,7 +88,7 @@ export default function WorkerHealth() {
   };
 
   // Load workers from the database
-  const loadWorkers = async () => {
+  const loadWorkers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -108,10 +108,10 @@ export default function WorkerHealth() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Load system stats
-  const loadSystemStats = async () => {
+  const loadSystemStats = useCallback(async () => {
     try {
       // Get job counts by status
       const { data: jobStats, error: jobStatsError } = await supabase
@@ -142,7 +142,7 @@ export default function WorkerHealth() {
       console.error('Error loading system stats:', err);
       // Don't set error state here to allow partial UI rendering
     }
-  };
+  }, [workers]);
 
   // Check for stale workers and trigger a worker health check
   const checkWorkerHealth = async () => {
@@ -181,7 +181,7 @@ export default function WorkerHealth() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [loadWorkers]);
 
   // Load system stats when workers change
   useEffect(() => {

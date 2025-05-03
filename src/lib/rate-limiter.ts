@@ -1,7 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { headers } from 'next/headers';
 import { getRateLimiter, setCache, getCache, deleteCache } from './redis';
-import { CACHE_EXPIRY } from './cache';
 
 export interface RateLimitResult {
   success: boolean;
@@ -18,6 +16,18 @@ export interface QuotaCheckResult {
   currentUsage: number;
   limitValue: number;
   remaining: number;
+}
+
+// Define types for documentation
+export interface DocumentationItem {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  order_index: number;
 }
 
 /**
@@ -333,70 +343,69 @@ export async function requestQuotaIncrease(
 }
 
 /**
- * Get documentation for a specific category
+ * Gets documentation entries from the database
  * @param category - The documentation category
- * @param publicOnly - Whether to return only public documentation
- * @returns Documentation items
+ * @param publicOnly - Whether to only include public documentation
+ * @returns Array of documentation entries
  */
 export async function getDocumentation(
   category: string,
   publicOnly: boolean = true
-): Promise<any[]> {
-  const cacheKey = `docs:${category}:${publicOnly ? 'public' : 'all'}`;
+): Promise<DocumentationItem[]> {
+  const supabase = createClient();
   
-  // Try to get from cache first
-  const cachedData = await getCache<any[]>(cacheKey);
-  if (cachedData) {
-    return cachedData;
-  }
-  
-  // If not in cache, fetch from database
   try {
-    const supabase = createClient();
-    const { data, error } = await supabase.rpc('get_documentation', {
-      p_category: category,
-      p_public_only: publicOnly
-    });
+    let query = supabase
+      .from('documentation')
+      .select('*')
+      .order('order_index', { ascending: true });
+    
+    if (category) {
+      query = query.eq('category', category);
+    }
+    
+    if (publicOnly) {
+      query = query.eq('is_public', true);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
-      console.error('Documentation fetch error:', error);
+      console.error('Error fetching documentation:', error);
       return [];
     }
     
-    const docs = JSON.parse(data || '[]');
-    
-    // Cache for longer period since documentation rarely changes
-    // 1 hour for public docs, 15 minutes for admin docs
-    const cacheTime = publicOnly ? 60 * 60 : 15 * 60;
-    await setCache(cacheKey, docs, cacheTime);
-    
-    return docs;
-  } catch (err) {
-    console.error('Documentation fetch error:', err);
+    return data as DocumentationItem[];
+  } catch (error) {
+    console.error('Error fetching documentation:', error);
     return [];
   }
 }
 
 /**
- * Add rate limit headers to a response
- * @param response - The response object
- * @param rateLimitResult - Rate limit info
- * @returns Updated response
+ * Add rate limit headers to an HTTP response
+ * @param response - The HTTP response
+ * @param rateLimitResult - The rate limit information
+ * @returns Updated response with rate limit headers
  */
 export function addRateLimitHeaders(
   response: Response,
   rateLimitResult: RateLimitResult
 ): Response {
-  response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-  response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  response.headers.set('X-RateLimit-Reset', String(Math.floor(rateLimitResult.reset.getTime() / 1000)));
+  const headers = new Headers(response.headers);
   
-  if (rateLimitResult.exceeded) {
-    response.headers.set(
-      'Retry-After', 
-      String(Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000))
-    );
+  // Add standard rate-limit headers
+  headers.set('X-RateLimit-Limit', rateLimitResult.limit.toString());
+  headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
+  headers.set('X-RateLimit-Reset', Math.floor(rateLimitResult.reset.getTime() / 1000).toString());
+  
+  if (rateLimitResult.isLimited) {
+    headers.set('Retry-After', Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000).toString());
   }
   
-  return response;
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 } 

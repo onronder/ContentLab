@@ -53,43 +53,50 @@ export function useSystemMonitoring() {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
   const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
 
-  // Get system performance metrics
-  const getSystemMetrics = useCallback(async (timeRange: string = '1h'): Promise<SystemMetrics | null> => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const supabase = createClient();
-      
-      // Get worker health data for the specified time range
-      const { data: workerHealthData, error: healthError } = await supabase
-        .from('worker_status_history')
-        .select('worker_id, status, cpu_usage, memory_usage, recorded_at')
-        .order('recorded_at', { ascending: true })
-        .gte('recorded_at', getTimeRangeStart(timeRange));
-      
-      if (healthError) throw healthError;
-      
-      // Get job statistics
-      const { data: jobStats, error: jobError } = await supabase.rpc('get_job_statistics');
-      
-      if (jobError) throw jobError;
-      
-      // Process the data
-      const metrics = processMetricsData(workerHealthData, jobStats, timeRange);
-      setSystemMetrics(metrics);
-      
-      return metrics;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-      return null;
-    } finally {
-      setLoading(false);
+  // Helper function to get the start time based on time range
+  const getTimeRangeStart = (timeRange: string): string => {
+    const now = new Date();
+    let startTime: Date;
+    
+    switch (timeRange) {
+      case '1h':
+        startTime = new Date(now.getTime() - 60 * 60 * 1000);
+        break;
+      case '6h':
+        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+        break;
+      case '24h':
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startTime = new Date(now.getTime() - 60 * 60 * 1000); // Default to 1 hour
     }
-  }, []);
+    
+    return startTime.toISOString();
+  };
+
+  // Helper function to determine appropriate bucket size for the time range
+  const getBucketSize = (timeRange: string): number => {
+    switch (timeRange) {
+      case '1h': return 5 * 60 * 1000; // 5 minutes
+      case '6h': return 15 * 60 * 1000; // 15 minutes
+      case '24h': return 60 * 60 * 1000; // 1 hour
+      case '7d': return 6 * 60 * 60 * 1000; // 6 hours
+      default: return 5 * 60 * 1000; // Default to 5 minutes
+    }
+  };
+
+  // Helper function to get bucket key for a timestamp
+  const getBucketKey = (timestamp: Date, bucketSize: number): string => {
+    const bucketTimestamp = Math.floor(timestamp.getTime() / bucketSize) * bucketSize;
+    return new Date(bucketTimestamp).toISOString();
+  };
 
   // Process the raw data into a format suitable for the UI
-  const processMetricsData = (workerHealthData: any[], jobStats: any, timeRange: string): SystemMetrics => {
+  const processMetricsData = useCallback((workerHealthData: Record<string, any>[], jobStats: Record<string, any>, timeRange: string): SystemMetrics => {
     // Group data by timestamp buckets appropriate for the time range
     const bucketSize = getBucketSize(timeRange);
     const buckets: Record<string, { cpu: number[], memory: number[] }> = {};
@@ -141,49 +148,42 @@ export function useSystemMonitoring() {
       },
       timestamps
     };
-  };
+  }, [getBucketSize, getBucketKey]);
 
-  // Helper function to get the start time based on time range
-  const getTimeRangeStart = (timeRange: string): string => {
-    const now = new Date();
-    let startTime: Date;
-    
-    switch (timeRange) {
-      case '1h':
-        startTime = new Date(now.getTime() - 60 * 60 * 1000);
-        break;
-      case '6h':
-        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-        break;
-      case '24h':
-        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case '7d':
-        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startTime = new Date(now.getTime() - 60 * 60 * 1000); // Default to 1 hour
+  // Get system performance metrics
+  const getSystemMetrics = useCallback(async (timeRange: string = '1h'): Promise<SystemMetrics | null> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const supabase = createClient();
+      
+      // Get worker health data for the specified time range
+      const { data: workerHealthData, error: healthError } = await supabase
+        .from('worker_status_history')
+        .select('worker_id, status, cpu_usage, memory_usage, recorded_at')
+        .order('recorded_at', { ascending: true })
+        .gte('recorded_at', getTimeRangeStart(timeRange));
+      
+      if (healthError) throw healthError;
+      
+      // Get job statistics
+      const { data: jobStats, error: jobError } = await supabase.rpc('get_job_statistics');
+      
+      if (jobError) throw jobError;
+      
+      // Process the data
+      const metrics = processMetricsData(workerHealthData, jobStats, timeRange);
+      setSystemMetrics(metrics);
+      
+      return metrics;
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+      return null;
+    } finally {
+      setLoading(false);
     }
-    
-    return startTime.toISOString();
-  };
-
-  // Helper function to determine appropriate bucket size for the time range
-  const getBucketSize = (timeRange: string): number => {
-    switch (timeRange) {
-      case '1h': return 5 * 60 * 1000; // 5 minutes
-      case '6h': return 15 * 60 * 1000; // 15 minutes
-      case '24h': return 60 * 60 * 1000; // 1 hour
-      case '7d': return 6 * 60 * 60 * 1000; // 6 hours
-      default: return 5 * 60 * 1000; // Default to 5 minutes
-    }
-  };
-
-  // Helper function to get bucket key for a timestamp
-  const getBucketKey = (timestamp: Date, bucketSize: number): string => {
-    const bucketTimestamp = Math.floor(timestamp.getTime() / bucketSize) * bucketSize;
-    return new Date(bucketTimestamp).toISOString();
-  };
+  }, [processMetricsData, getTimeRangeStart]);
 
   // Get alert configuration
   const getAlertConfig = useCallback(async (): Promise<AlertConfig | null> => {

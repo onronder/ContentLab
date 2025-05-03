@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -51,7 +51,7 @@ export default function ConnectionPoolManager() {
   });
 
   // Fetch connection pool data
-  const fetchPoolData = async (hours: number = 24) => {
+  const fetchPoolData = useCallback(async (hours: number = 24) => {
     setIsLoading(true);
     setError(null);
     
@@ -78,7 +78,7 @@ export default function ConnectionPoolManager() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Reset connection pool
   const resetPool = async () => {

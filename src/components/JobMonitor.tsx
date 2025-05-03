@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { formatDistance } from 'date-fns';
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -154,7 +153,7 @@ export default function JobMonitor() {
   const selectedJob = jobs.find(job => job.id === selectedJobId);
 
   // Load jobs from the database
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -194,10 +193,10 @@ export default function JobMonitor() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, jobsPerPage, selectedJobId]);
 
   // Load job history for a specific job
-  const loadJobHistory = async (jobId: string) => {
+  const loadJobHistory = useCallback(async (jobId: string) => {
     try {
       const { data: historyData, error: historyError } = await supabase
         .from('job_history')
@@ -216,7 +215,7 @@ export default function JobMonitor() {
     } catch (err) {
       console.error(`Error loading history for job ${jobId}:`, err);
     }
-  };
+  }, []);
 
   // Cancel a job
   const cancelJob = async (jobId: string) => {
@@ -320,61 +319,6 @@ export default function JobMonitor() {
     return filteredJobs;
   };
 
-  // Load jobs on component mount
-  useEffect(() => {
-    loadJobs();
-
-    // Set up real-time subscription for job updates
-    const subscription = supabase
-      .channel('analysis_jobs_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'analysis_jobs' 
-      }, payload => {
-        console.log('Job change detected:', payload);
-        
-        // Handle different types of changes intelligently
-        if (payload.eventType === 'INSERT') {
-          // For new jobs, we might need to reload or append
-          if (currentPage === 1) {
-            loadJobs(); // Reload if we're on the first page
-          } else {
-            // Just update the count for other pages
-            setTotalJobs(prev => prev + 1);
-          }
-        } else if (payload.eventType === 'DELETE') {
-          // For deleted jobs, remove from state if it exists
-          setJobs(prevJobs => prevJobs.filter(job => job.id !== payload.old.id));
-          setTotalJobs(prev => Math.max(0, prev - 1));
-          
-          // If the selected job was deleted, clear selection
-          if (selectedJobId === payload.old.id) {
-            setSelectedJobId(null);
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          // For updates, patch the state directly
-          const updatedJob = payload.new;
-          setJobs(prevJobs => prevJobs.map(job => 
-            job.id === updatedJob.id 
-              ? { ...job, ...updatedJob } 
-              : job
-          ));
-          
-          // If the selected job was updated, refresh its history
-          if (selectedJobId === updatedJob.id) {
-            loadJobHistory(updatedJob.id);
-          }
-        }
-      })
-      .subscribe();
-
-    // Clean up subscription
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [currentPage]); // Re-subscribe when page changes
-
   // Load job history when a job is selected
   useEffect(() => {
     if (selectedJobId) {
@@ -382,10 +326,30 @@ export default function JobMonitor() {
     }
   }, [selectedJobId, loadJobHistory]);
 
-  // Add useEffect to reload jobs when page changes
+  // Subscribe to job updates (adjust this based on your actual implementation)
   useEffect(() => {
     loadJobs();
-  }, [currentPage, loadJobs]);
+    
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('job_updates')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'analysis_jobs' 
+      }, () => {
+        loadJobs();
+        if (selectedJobId) {
+          loadJobHistory(selectedJobId);
+        }
+      })
+      .subscribe();
+    
+    // Clean up subscription
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [currentPage, loadJobs, loadJobHistory, selectedJobId]);
 
   // Add pagination controls
   const Pagination = () => {
