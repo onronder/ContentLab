@@ -12,7 +12,7 @@
     "build-minimal": "next build --no-lint",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "npm install --legacy-peer-deps && next build"
+    "vercel-build": "pnpm install && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
