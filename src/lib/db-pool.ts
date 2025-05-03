@@ -20,6 +20,7 @@ class DBPool {
   private static instance: Pool;
   private static isInitialized = false;
   private static clients: Map<string, PoolClient> = new Map();
+  private static isClosing = false;
 
   private constructor() {}
 
@@ -76,18 +77,38 @@ class DBPool {
    * Clean up all connections when shutting down
    */
   public static async cleanup(): Promise<void> {
+    // Prevent multiple calls to cleanup
+    if (DBPool.isClosing) {
+      console.log('Cleanup already in progress, skipping duplicate call');
+      return;
+    }
+    
+    DBPool.isClosing = true;
     console.log('Cleaning up database connections');
     
     // Release all tracked clients
     for (const [id, client] of DBPool.clients.entries()) {
-      client.release();
-      DBPool.clients.delete(id);
+      try {
+        client.release();
+        DBPool.clients.delete(id);
+      } catch (err) {
+        console.error(`Error releasing client ${id}:`, err);
+      }
     }
     
-    // End the pool
+    // End the pool only if it exists and isn't already ending
     if (DBPool.instance) {
-      await DBPool.instance.end();
+      try {
+        await DBPool.instance.end();
+        DBPool.instance = null as any; // Clear the instance
+        DBPool.isInitialized = false;
+        console.log('Pool ended successfully');
+      } catch (err) {
+        console.error('Error ending pool:', err);
+      }
     }
+    
+    DBPool.isClosing = false;
   }
 }
 

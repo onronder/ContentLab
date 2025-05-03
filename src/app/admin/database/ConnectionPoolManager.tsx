@@ -68,8 +68,8 @@ export default function ConnectionPoolManager() {
       // Check for extension availability
       if (data.extensions) {
         setExtensionStatus({
-          pgCron: !!data.extensions.pg_cron,
-          pgBouncer: !!data.extensions.pgbouncer
+          pgCron: !!data.extensions.pgCron,
+          pgBouncer: !!data.extensions.pgBouncer
         });
       }
     } catch (err) {
@@ -185,7 +185,7 @@ export default function ConnectionPoolManager() {
     }, 30000);
     
     return () => clearInterval(intervalId);
-  }, []);
+  }, [timeRange, fetchPoolData]);
 
   return (
     <div className="space-y-6">

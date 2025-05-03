@@ -138,7 +138,35 @@ async function fetchAndExtractContent(url: string, retryCount = 0): Promise<Scra
   try {
     console.log(`Fetching content from ${url} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
     
-    const response = await fetch(url, {
+    // Validate and normalize URL first
+    let normalizedUrl = url;
+    try {
+      // Make sure the URL has a protocol
+      if (!/^https?:\/\//i.test(normalizedUrl)) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      
+      // Validate URL format
+      const urlObj = new URL(normalizedUrl);
+      
+      // Make sure the URL has a valid hostname
+      if (!urlObj.hostname || urlObj.hostname === 'localhost') {
+        throw new Error(`Invalid URL hostname: ${urlObj.hostname}`);
+      }
+      
+      // Normalize the URL with the parsed object to ensure it's well-formed
+      normalizedUrl = urlObj.toString();
+    } catch (urlError) {
+      return {
+        url,
+        title: null,
+        content: "",
+        success: false,
+        error: `Invalid URL: ${urlError.message}`
+      };
+    }
+    
+    const response = await fetch(normalizedUrl, {
       headers: {
         'User-Agent': USER_AGENT,
         'Accept': 'text/html,application/xhtml+xml',
@@ -622,6 +650,30 @@ Deno.serve(async (req: Request) => {
     if (!payload.user_url || !payload.competitor_urls || payload.competitor_urls.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Invalid request. Requires user_url and at least one competitor_url' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
+    
+    // Validate URL formats
+    try {
+      // Validate user URL
+      if (!/^https?:\/\//i.test(payload.user_url)) {
+        payload.user_url = `https://${payload.user_url}`;
+      }
+      new URL(payload.user_url);
+      
+      // Validate competitor URLs
+      for (let i = 0; i < payload.competitor_urls.length; i++) {
+        let url = payload.competitor_urls[i];
+        if (!/^https?:\/\//i.test(url)) {
+          url = `https://${url}`;
+          payload.competitor_urls[i] = url;
+        }
+        new URL(url);
+      }
+    } catch (urlError) {
+      return new Response(
+        JSON.stringify({ error: `Invalid URL: ${urlError.message}` }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }

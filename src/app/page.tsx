@@ -179,8 +179,45 @@ export default function Home() {
       pollingIntervalRef.current = null;
     }
 
-    const validCompetitorUrls = competitorUrls.filter(url => url.trim());
-    if (!userUrl.trim() || validCompetitorUrls.length === 0) {
+    // Validate and format URLs
+    let formattedUserUrl = userUrl.trim();
+    // Add https:// if no protocol specified
+    if (!/^https?:\/\//i.test(formattedUserUrl)) {
+      formattedUserUrl = `https://${formattedUserUrl}`;
+    }
+    
+    // Validate user URL
+    try {
+      new URL(formattedUserUrl);
+    } catch (e) {
+      setError(`Invalid URL: '${userUrl.trim()}'`);
+      setIsLoading(false);
+      return;
+    }
+
+    // Format and validate competitor URLs
+    const validCompetitorUrls = competitorUrls
+      .filter(url => url.trim())
+      .map(url => {
+        let formatted = url.trim();
+        if (!/^https?:\/\//i.test(formatted)) {
+          formatted = `https://${formatted}`;
+        }
+        return formatted;
+      });
+    
+    // Validate each competitor URL
+    for (const url of validCompetitorUrls) {
+      try {
+        new URL(url);
+      } catch (e) {
+        setError(`Invalid competitor URL: '${url}'`);
+        setIsLoading(false);
+        return;
+      }
+    }
+    
+    if (!formattedUserUrl || validCompetitorUrls.length === 0) {
       setError("Please provide your URL and at least one valid competitor URL.");
       setIsLoading(false);
       return;
@@ -196,7 +233,7 @@ export default function Home() {
           // Add any other headers that might be needed
         },
         body: JSON.stringify({
-          user_url: userUrl.trim(),
+          user_url: formattedUserUrl,
           competitor_urls: validCompetitorUrls,
         }),
       });
@@ -227,7 +264,7 @@ export default function Home() {
         completed_at: null,
         project_id: '', // Project ID is created/linked in the function
         user_id: session.user.id,
-        user_url: userUrl.trim(),
+        user_url: formattedUserUrl,
         competitor_urls: validCompetitorUrls
       });
       pollForResult(newJobId);

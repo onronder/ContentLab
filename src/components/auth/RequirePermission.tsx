@@ -135,7 +135,7 @@ export function PermissionDenied() {
     <Alert variant="destructive">
       <AlertTriangleIcon className="h-4 w-4 mr-2" />
       <AlertDescription>
-        You don't have permission to access this resource.
+        You don&apos;t have permission to access this resource.
       </AlertDescription>
     </Alert>
   );

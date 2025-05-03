@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuotaManagement } from '@/hooks/useQuotaManagement';
-import { ChevronUp, ChevronDown, AlertTriangle, Check, Clock, X } from 'lucide-react';
+import { AlertTriangle, Check, Clock, X } from 'lucide-react';
 
 interface QuotaUsageProps {
   organizationId: string;
@@ -31,7 +31,6 @@ export function QuotaUsage({ organizationId }: QuotaUsageProps) {
     usageInfo,
     loading,
     error,
-    canRunAnalysis,
     quotaPercentages,
     refreshQuota,
     requestQuotaIncrease,
@@ -198,7 +197,7 @@ export function QuotaUsage({ organizationId }: QuotaUsageProps) {
                     <div className="flex items-center p-3 text-sm border rounded border-amber-200 bg-amber-50 text-amber-700 mt-4">
                       <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
                       <div>
-                        You're approaching your analysis quota limit. 
+                        You&apos;re approaching your analysis quota limit. 
                         Consider requesting a quota increase or upgrading your plan.
                       </div>
                     </div>

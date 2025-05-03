@@ -11,6 +11,7 @@ export interface Organization {
   logo_url?: string;
   subscription_tier: string;
   subscription_status: string;
+  userRole?: string;
 }
 
 export interface UserRole {
@@ -88,10 +89,18 @@ export function useAuth() {
       
       if (orgError) throw orgError;
       
-      const organizations = orgMembers?.map(member => ({
-        ...member.organization,
-        userRole: member.role
-      })) || [];
+      const organizations: Organization[] = (orgMembers || []).map(member => {
+        const org = member.organization as any;
+        return {
+          id: org.id,
+          name: org.name,
+          description: org.description,
+          logo_url: org.logo_url,
+          subscription_tier: org.subscription_tier,
+          subscription_status: org.subscription_status,
+          userRole: member.role
+        };
+      });
       
       // Get user roles
       const { data: roleAssignments, error: roleError } = await supabase
@@ -107,7 +116,14 @@ export function useAuth() {
       
       if (roleError) throw roleError;
       
-      const roles = roleAssignments?.map(assignment => assignment.role) || [];
+      const roles: UserRole[] = (roleAssignments || []).map(assignment => {
+        const role = assignment.role as any;
+        return {
+          id: role.id,
+          name: role.name,
+          description: role.description
+        };
+      });
       
       // Get user permissions
       const { data: permissions, error: permError } = await supabase

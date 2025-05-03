@@ -1,7 +1,7 @@
 import { dbPool, executeQuery, withTransaction } from '@/lib/db-pool';
 
 // Initialize the database pool when this module is first loaded
-const pool = dbPool;
+// We import dbPool directly instead of creating a separate variable
 
 /**
  * Initialize database connection tracking

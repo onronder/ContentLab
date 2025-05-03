@@ -1,9 +1,9 @@
 import { Redis } from '@upstash/redis';
-import { RateLimiter } from '@upstash/ratelimit';
+import { Ratelimit } from '@upstash/ratelimit';
 
 // Create Redis client for distributed caching and rate limiting
 let redis: Redis;
-let rateLimiter: Record<string, RateLimiter>;
+let rateLimiter: Record<string, Ratelimit>;
 
 export function getRedisClient() {
   if (!redis) {
@@ -36,9 +36,9 @@ export function getRateLimiter(planType: 'free' | 'starter' | 'pro' | 'enterpris
     };
 
     // Create the rate limiter using the Upstash sliding window algorithm
-    rateLimiter[planType] = new RateLimiter({
+    rateLimiter[planType] = new Ratelimit({
       redis: getRedisClient(),
-      limiter: RateLimiter.slidingWindow(limits[planType].requests, `${limits[planType].per} s`),
+      limiter: Ratelimit.slidingWindow(limits[planType].requests, `${limits[planType].per} s`),
       analytics: true,
       prefix: `ratelimit:${planType}`,
     });
@@ -97,7 +97,10 @@ export async function clearCacheByPrefix(prefix: string): Promise<void> {
   const keys = await client.keys(`${prefix}*`);
   
   if (keys.length > 0) {
-    await client.del(keys);
+    // Use Promise.all to delete multiple keys if needed
+    for (const key of keys) {
+      await client.del(key);
+    }
   }
 }
 

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { formatDistance } from 'date-fns';
@@ -378,12 +380,12 @@ export default function JobMonitor() {
     if (selectedJobId) {
       loadJobHistory(selectedJobId);
     }
-  }, [selectedJobId]);
+  }, [selectedJobId, loadJobHistory]);
 
   // Add useEffect to reload jobs when page changes
   useEffect(() => {
     loadJobs();
-  }, [currentPage]);
+  }, [currentPage, loadJobs]);
 
   // Add pagination controls
   const Pagination = () => {
@@ -474,7 +476,7 @@ export default function JobMonitor() {
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>No jobs found</AlertTitle>
                 <AlertDescription>
-                  You don't have any analysis jobs yet. Start a new analysis to create one.
+                  You don&apos;t have any analysis jobs yet. Start a new analysis to create one.
                 </AlertDescription>
               </Alert>
             ) : (

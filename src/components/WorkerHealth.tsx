@@ -79,11 +79,7 @@ export default function WorkerHealth() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Format date
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
-  };
+  // Removed unused formatDate function
 
   // Format time ago
   const formatTimeAgo = (dateString: string | null) => {
@@ -192,7 +188,7 @@ export default function WorkerHealth() {
     if (workers.length > 0) {
       loadSystemStats();
     }
-  }, [workers]);
+  }, [workers, loadSystemStats]);
 
   // Render loading state
   if (loading && workers.length === 0) {
