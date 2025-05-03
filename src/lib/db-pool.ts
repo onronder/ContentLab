@@ -100,7 +100,7 @@ class DBPool {
     if (DBPool.instance) {
       try {
         await DBPool.instance.end();
-        DBPool.instance = null as any; // Clear the instance
+        DBPool.instance = undefined as unknown as Pool; // Clear the instance
         DBPool.isInitialized = false;
         console.log('Pool ended successfully');
       } catch (err) {
@@ -132,7 +132,8 @@ export const getSupabaseClientWithPool = () => {
         if (urlString.includes('/rest/v1')) {
           // Handle the actual fetching using our pool
           try {
-            const pool = DBPool.getInstance();
+            // Ensure pool is initialized but we don't need the reference
+            DBPool.getInstance();
             // Continue with the fetch, but now it will use our pooled connection
           } catch (error) {
             console.error('Error with database pool:', error);
@@ -152,9 +153,9 @@ export const getSupabaseClientWithPool = () => {
 export const dbPool = DBPool.getInstance();
 
 // Export a function for executing queries with automatic client handling
-export async function executeQuery<T = any>(
+export async function executeQuery<T = Record<string, unknown>>(
   query: string, 
-  params: any[] = [],
+  params: unknown[] = [],
   clientId?: string
 ): Promise<T[]> {
   const useClientId = clientId || `query-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

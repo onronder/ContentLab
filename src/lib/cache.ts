@@ -6,7 +6,7 @@ interface CacheItem<T> {
 }
 
 // In-memory cache for frequently accessed data
-const memoryCache = new Map<string, CacheItem<any>>();
+const memoryCache = new Map<string, CacheItem<unknown>>();
 
 /**
  * Default cache expiry times

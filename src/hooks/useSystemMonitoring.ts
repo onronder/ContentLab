@@ -44,6 +44,22 @@ interface AlertCheckResult {
   high_resource_workers?: number;
 }
 
+interface WorkerHealthData {
+  worker_id: string;
+  status: string;
+  cpu_usage: number;
+  memory_usage: number;
+  recorded_at: string;
+}
+
+interface JobStats {
+  pending_jobs: number;
+  active_jobs: number;
+  completed_jobs_24h: number;
+  failed_jobs_24h: number;
+  avg_completion_time: number;
+}
+
 /**
  * Hook for system monitoring and alerts
  */
@@ -53,50 +69,27 @@ export function useSystemMonitoring() {
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
   const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
 
-  // Helper function to get the start time based on time range
-  const getTimeRangeStart = (timeRange: string): string => {
-    const now = new Date();
-    let startTime: Date;
-    
-    switch (timeRange) {
-      case '1h':
-        startTime = new Date(now.getTime() - 60 * 60 * 1000);
-        break;
-      case '6h':
-        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-        break;
-      case '24h':
-        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case '7d':
-        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startTime = new Date(now.getTime() - 60 * 60 * 1000); // Default to 1 hour
-    }
-    
-    return startTime.toISOString();
-  };
 
-  // Helper function to determine appropriate bucket size for the time range
-  const getBucketSize = (timeRange: string): number => {
-    switch (timeRange) {
-      case '1h': return 5 * 60 * 1000; // 5 minutes
-      case '6h': return 15 * 60 * 1000; // 15 minutes
-      case '24h': return 60 * 60 * 1000; // 1 hour
-      case '7d': return 6 * 60 * 60 * 1000; // 6 hours
-      default: return 5 * 60 * 1000; // Default to 5 minutes
-    }
-  };
-
-  // Helper function to get bucket key for a timestamp
-  const getBucketKey = (timestamp: Date, bucketSize: number): string => {
-    const bucketTimestamp = Math.floor(timestamp.getTime() / bucketSize) * bucketSize;
-    return new Date(bucketTimestamp).toISOString();
-  };
 
   // Process the raw data into a format suitable for the UI
-  const processMetricsData = useCallback((workerHealthData: Record<string, any>[], jobStats: Record<string, any>, timeRange: string): SystemMetrics => {
+  const processMetricsData = useCallback((workerHealthData: WorkerHealthData[], jobStats: JobStats, timeRange: string): SystemMetrics => {
+    // Helper function to determine appropriate bucket size for the time range
+    const getBucketSize = (timeRange: string): number => {
+      switch (timeRange) {
+        case '1h': return 5 * 60 * 1000; // 5 minutes
+        case '6h': return 15 * 60 * 1000; // 15 minutes
+        case '24h': return 60 * 60 * 1000; // 1 hour
+        case '7d': return 6 * 60 * 60 * 1000; // 6 hours
+        default: return 5 * 60 * 1000; // Default to 5 minutes
+      }
+    };
+
+    // Helper function to get bucket key for a timestamp
+    const getBucketKey = (timestamp: Date, bucketSize: number): string => {
+      const bucketTimestamp = Math.floor(timestamp.getTime() / bucketSize) * bucketSize;
+      return new Date(bucketTimestamp).toISOString();
+    };
+
     // Group data by timestamp buckets appropriate for the time range
     const bucketSize = getBucketSize(timeRange);
     const buckets: Record<string, { cpu: number[], memory: number[] }> = {};
@@ -148,13 +141,38 @@ export function useSystemMonitoring() {
       },
       timestamps
     };
-  }, [getBucketSize, getBucketKey]);
+  }, []);
 
   // Get system performance metrics
   const getSystemMetrics = useCallback(async (timeRange: string = '1h'): Promise<SystemMetrics | null> => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Helper function to get the start time based on time range
+      const getTimeRangeStart = (timeRange: string): string => {
+        const now = new Date();
+        let startTime: Date;
+        
+        switch (timeRange) {
+          case '1h':
+            startTime = new Date(now.getTime() - 60 * 60 * 1000);
+            break;
+          case '6h':
+            startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+            break;
+          case '24h':
+            startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            break;
+          case '7d':
+            startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            startTime = new Date(now.getTime() - 60 * 60 * 1000); // Default to 1 hour
+        }
+        
+        return startTime.toISOString();
+      };
       
       const supabase = createClient();
       
@@ -172,8 +190,11 @@ export function useSystemMonitoring() {
       
       if (jobError) throw jobError;
       
+      const typedWorkerHealthData = workerHealthData as WorkerHealthData[];
+      const typedJobStats = jobStats as JobStats;
+      
       // Process the data
-      const metrics = processMetricsData(workerHealthData, jobStats, timeRange);
+      const metrics = processMetricsData(typedWorkerHealthData, typedJobStats, timeRange);
       setSystemMetrics(metrics);
       
       return metrics;
@@ -183,7 +204,7 @@ export function useSystemMonitoring() {
     } finally {
       setLoading(false);
     }
-  }, [processMetricsData, getTimeRangeStart]);
+  }, [processMetricsData]);
 
   // Get alert configuration
   const getAlertConfig = useCallback(async (): Promise<AlertConfig | null> => {

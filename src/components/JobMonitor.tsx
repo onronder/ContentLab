@@ -193,7 +193,7 @@ export default function JobMonitor() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, jobsPerPage, selectedJobId]);
+  }, [currentPage, jobsPerPage, selectedJobId, supabase]);
 
   // Load job history for a specific job
   const loadJobHistory = useCallback(async (jobId: string) => {
@@ -215,7 +215,7 @@ export default function JobMonitor() {
     } catch (err) {
       console.error(`Error loading history for job ${jobId}:`, err);
     }
-  }, []);
+  }, [supabase]);
 
   // Cancel a job
   const cancelJob = async (jobId: string) => {
@@ -349,7 +349,7 @@ export default function JobMonitor() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [currentPage, loadJobs, loadJobHistory, selectedJobId]);
+  }, [currentPage, loadJobs, loadJobHistory, selectedJobId, supabase]);
 
   // Add pagination controls
   const Pagination = () => {

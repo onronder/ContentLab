@@ -8,7 +8,6 @@ import {
   Card, 
   CardContent, 
   CardDescription, 
-  CardFooter, 
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
@@ -33,8 +32,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, XCircle, Clock, Search, Filter, ExternalLink } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CheckCircle, XCircle, Clock, Search } from 'lucide-react';
 
 // Type definition for quota requests
 interface QuotaRequest {
@@ -129,7 +128,7 @@ export function QuotaRequestList({ requests }: QuotaRequestListProps) {
     
     try {
       // Call the RPC function to process the request
-      const { data, error } = await supabase.rpc('process_quota_increase_request', {
+      const { error } = await supabase.rpc('process_quota_increase_request', {
         p_request_id: selectedRequest.id,
         p_approved: approved,
         p_custom_limit: customLimit
@@ -147,19 +146,7 @@ export function QuotaRequestList({ requests }: QuotaRequestListProps) {
       setIsDialogOpen(false);
       
       // Update the request in the local state
-      const updatedRequests = requests.map(req => 
-        req.id === selectedRequest.id
-          ? { 
-              ...req, 
-              status: approved ? 'approved' : 'rejected',
-              reviewedBy: 'Current Admin', // This should be replaced with the actual admin name
-              reviewedAt: new Date().toISOString()
-            }
-          : req
-      );
-      
-      // This is a bit hacky since we're not actually updating the props,
-      // but for demonstration purposes, we'll reload the page
+      // This is a bit hacky since we're not actually updating the props
       window.location.reload();
       
     } catch (err) {

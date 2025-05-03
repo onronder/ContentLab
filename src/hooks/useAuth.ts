@@ -90,7 +90,16 @@ export function useAuth() {
       if (orgError) throw orgError;
       
       const organizations: Organization[] = (orgMembers || []).map(member => {
-        const org = member.organization as any;
+        // Type assertion with unknown first to avoid type errors
+        const org = member.organization as unknown as {
+          id: string;
+          name: string;
+          description?: string;
+          logo_url?: string;
+          subscription_tier: string;
+          subscription_status: string;
+        };
+        
         return {
           id: org.id,
           name: org.name,
@@ -117,7 +126,12 @@ export function useAuth() {
       if (roleError) throw roleError;
       
       const roles: UserRole[] = (roleAssignments || []).map(assignment => {
-        const role = assignment.role as any;
+        const role = assignment.role as unknown as {
+          id: string;
+          name: string;
+          description?: string;
+        };
+        
         return {
           id: role.id,
           name: role.name,
@@ -159,7 +173,7 @@ export function useAuth() {
     
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event) => {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           fetchUserData();
         } else if (event === 'SIGNED_OUT') {

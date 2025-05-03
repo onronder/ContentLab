@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LockIcon, MailIcon } from "lucide-react";
 
 export default function LoginForm() {
-  const [view, setView] = useState<"sign_in" | "sign_up" | "forgotten_password">("sign_in");
+  // Using useState but with _ for the setter since we're not using it
+  const [view] = useState<"sign_in" | "sign_up" | "forgotten_password">("sign_in");
   const supabase = createClient();
   
   // Map of view titles

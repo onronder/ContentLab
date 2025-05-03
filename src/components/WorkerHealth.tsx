@@ -43,7 +43,7 @@ interface Worker {
     cpu_usage?: number;
     memory_usage?: number;
     version?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -110,39 +110,45 @@ export default function WorkerHealth() {
     }
   }, []);
 
-  // Load system stats
-  const loadSystemStats = useCallback(async () => {
-    try {
-      // Get job counts by status
-      const { data: jobStats, error: jobStatsError } = await supabase
-        .rpc('get_job_stats');
-
-      if (jobStatsError) throw jobStatsError;
-
-      // Get average processing time
-      const { data: avgTimeData, error: avgTimeError } = await supabase
-        .rpc('get_avg_processing_time');
-
-      if (avgTimeError) throw avgTimeError;
-
-      // Count active workers
-      const activeWorkers = workers.filter(w => w.status === 'ACTIVE').length;
-
-      // Set system stats
-      setSystemStats({
-        active_workers: activeWorkers,
-        total_jobs: jobStats?.total || 0,
-        pending_jobs: jobStats?.pending || 0,
-        processing_jobs: jobStats?.processing || 0,
-        completed_jobs: jobStats?.completed || 0,
-        failed_jobs: jobStats?.failed || 0,
-        avg_processing_time: avgTimeData?.avg_time || null,
-      });
-    } catch (err) {
-      console.error('Error loading system stats:', err);
-      // Don't set error state here to allow partial UI rendering
+  // Load system stats when workers change
+  useEffect(() => {
+    if (workers.length > 0) {
+      const loadSystemStats = async () => {
+        try {
+          // Get job counts by status
+          const { data: jobStats, error: jobStatsError } = await supabase
+            .rpc('get_job_stats');
+    
+          if (jobStatsError) throw jobStatsError;
+    
+          // Get average processing time
+          const { data: avgTimeData, error: avgTimeError } = await supabase
+            .rpc('get_avg_processing_time');
+    
+          if (avgTimeError) throw avgTimeError;
+    
+          // Count active workers
+          const activeWorkers = workers.filter(w => w.status === 'ACTIVE').length;
+    
+          // Set system stats
+          setSystemStats({
+            active_workers: activeWorkers,
+            total_jobs: jobStats?.total || 0,
+            pending_jobs: jobStats?.pending || 0,
+            processing_jobs: jobStats?.processing || 0,
+            completed_jobs: jobStats?.completed || 0,
+            failed_jobs: jobStats?.failed || 0,
+            avg_processing_time: avgTimeData?.avg_time || null,
+          });
+        } catch (err) {
+          console.error('Error loading system stats:', err);
+          // Don't set error state here to allow partial UI rendering
+        }
+      };
+      
+      loadSystemStats();
     }
-  }, [workers]);
+  }, [workers, supabase]);
 
   // Check for stale workers and trigger a worker health check
   const checkWorkerHealth = async () => {
@@ -182,13 +188,6 @@ export default function WorkerHealth() {
       supabase.removeChannel(subscription);
     };
   }, [loadWorkers]);
-
-  // Load system stats when workers change
-  useEffect(() => {
-    if (workers.length > 0) {
-      loadSystemStats();
-    }
-  }, [workers, loadSystemStats]);
 
   // Render loading state
   if (loading && workers.length === 0) {

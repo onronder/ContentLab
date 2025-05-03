@@ -46,7 +46,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -70,7 +69,6 @@ export default function Home() {
         setIsLoading(false);
         setError(null);
         setAnalysisResult(null);
-        setJobId(null);
         setIsPolling(false);
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -152,13 +150,13 @@ export default function Home() {
             setError(result.error_message || "Analysis failed with an unknown error.");
           }
         }
-      } catch (pollError: any) {
+      } catch (pollError) {
         console.error("Polling error:", pollError);
         clearInterval(pollingIntervalRef.current!);
         pollingIntervalRef.current = null;
         setIsPolling(false);
         setIsLoading(false);
-        setError(pollError.message || "Error checking analysis status.");
+        setError(pollError instanceof Error ? pollError.message : "Error checking analysis status.");
       }
     }, 5000); // Poll every 5 seconds
   };
@@ -171,7 +169,6 @@ export default function Home() {
 
     setAnalysisResult(null);
     setError(null);
-    setJobId(null);
     setIsLoading(true);
     setIsPolling(false);
     if (pollingIntervalRef.current) {
@@ -189,7 +186,7 @@ export default function Home() {
     // Validate user URL
     try {
       new URL(formattedUserUrl);
-    } catch (e) {
+    } catch {
       setError(`Invalid URL: '${userUrl.trim()}'`);
       setIsLoading(false);
       return;
@@ -210,7 +207,7 @@ export default function Home() {
     for (const url of validCompetitorUrls) {
       try {
         new URL(url);
-      } catch (e) {
+      } catch {
         setError(`Invalid competitor URL: '${url}'`);
         setIsLoading(false);
         return;
@@ -244,17 +241,15 @@ export default function Home() {
       }
 
       const data = await response.json() as AnalysisResponse;
-      const newJobId = data.job_id;
 
-      if (!newJobId) {
+      if (!data.job_id) {
         throw new Error("Analysis started but did not return a job ID.");
       }
 
-      setJobId(newJobId);
       setIsPolling(true);
       // Set initial pending state for UI
       setAnalysisResult({
-        id: newJobId,
+        id: data.job_id,
         status: 'PENDING',
         content_gaps: null,
         popular_themes: null,
@@ -267,11 +262,11 @@ export default function Home() {
         user_url: formattedUserUrl,
         competitor_urls: validCompetitorUrls
       });
-      pollForResult(newJobId);
+      pollForResult(data.job_id);
 
-    } catch (apiError: any) {
+    } catch (apiError) {
       console.error("Analysis initiation error:", apiError);
-      setError(apiError.message || "Failed to initiate analysis.");
+      setError(apiError instanceof Error ? apiError.message : "Failed to initiate analysis.");
       setIsLoading(false);
     }
   };
@@ -326,7 +321,7 @@ export default function Home() {
               type="url"
               placeholder="https://yourblog.com"
               value={userUrl}
-              onChange={(e) => setUserUrl(e.target.value)}
+              onChange={(event) => setUserUrl(event.target.value)}
               disabled={isLoading}
             />
           </div>
@@ -339,7 +334,7 @@ export default function Home() {
                   type="url"
                   placeholder={`https://competitor${index + 1}.com`}
                   value={url}
-                  onChange={(e) => handleCompetitorUrlChange(index, e.target.value)}
+                  onChange={(event) => handleCompetitorUrlChange(index, event.target.value)}
                   disabled={isLoading}
                 />
                 {competitorUrls.length > 1 && (

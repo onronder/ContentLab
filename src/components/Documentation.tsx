@@ -15,14 +15,22 @@ export function Documentation({
   defaultCategory = 'rate_limits' 
 }: DocumentationProps) {
   const [activeTab, setActiveTab] = useState(defaultCategory);
-  const [docs, setDocs] = useState<{ [key: string]: any[] }>({});
+  interface DocItem {
+    id: string;
+    content: string;
+    category: string;
+    created_at: string;
+    updated_at: string;
+  }
+  
+  const [docs, setDocs] = useState<{ [key: string]: DocItem[] }>({});
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     const fetchDocs = async () => {
       setLoading(true);
       try {
-        const result: { [key: string]: any[] } = {};
+        const result: { [key: string]: DocItem[] } = {};
         
         for (const category of categories) {
           const data = await getDocumentation(category, true);

@@ -21,6 +21,19 @@ interface UsageInfo {
 
 type QuotaRequestType = 'analyses' | 'competitors' | 'api_requests' | 'storage';
 
+interface QuotaRequest {
+  id: string;
+  request_type: string;
+  current_limit: number;
+  requested_limit: number;
+  reason: string;
+  status: string;
+  created_at: string;
+  requested_by: { email: string };
+  reviewed_by: { email: string } | null;
+  reviewed_at: string | null;
+}
+
 interface QuotaManagementReturn {
   quotaInfo: QuotaInfo | null;
   usageInfo: UsageInfo | null;
@@ -35,7 +48,7 @@ interface QuotaManagementReturn {
   };
   refreshQuota: () => Promise<void>;
   requestQuotaIncrease: (type: QuotaRequestType, requestedLimit: number, reason?: string) => Promise<boolean>;
-  getQuotaIncreaseRequests: () => Promise<any[]>;
+  getQuotaIncreaseRequests: () => Promise<QuotaRequest[]>;
 }
 
 export function useQuotaManagement(organizationId?: string): QuotaManagementReturn {
@@ -149,7 +162,7 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
   }, [organizationId, supabase, toast]);
 
   // Get all quota increase requests for this organization
-  const getQuotaIncreaseRequests = useCallback(async () => {
+  const getQuotaIncreaseRequests = useCallback(async (): Promise<QuotaRequest[]> => {
     if (!organizationId) return [];
     
     try {
@@ -172,7 +185,21 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
       
       if (error) throw error;
       
-      return data || [];
+      // Transform the data to match the QuotaRequest interface
+      const requests: QuotaRequest[] = (data || []).map((item: any) => ({
+        id: item.id,
+        request_type: item.request_type,
+        current_limit: item.current_limit,
+        requested_limit: item.requested_limit,
+        reason: item.reason,
+        status: item.status,
+        created_at: item.created_at,
+        requested_by: { email: item.requested_by?.[0]?.email || '' },
+        reviewed_by: item.reviewed_by?.[0] ? { email: item.reviewed_by[0].email } : null,
+        reviewed_at: item.reviewed_at
+      }));
+      
+      return requests;
     } catch (err) {
       console.error('Error fetching quota increase requests:', err);
       return [];

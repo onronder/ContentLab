@@ -55,8 +55,8 @@ export async function incrementAndLog() {
 
   // await cf.env.DB.prepare('INSERT INTO access_logs (ip, path, accessed_at) VALUES (?, ?, datetime())')
   //   .bind(
-  //     headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown',
-  //     headersList.get('x-forwarded-host') || '/'
+  //     'unknown', // Replace headersList references
+  //     '/'
   //   )
   //   .run()
 

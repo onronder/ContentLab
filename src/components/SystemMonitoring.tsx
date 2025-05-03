@@ -136,7 +136,7 @@ export default function SystemMonitoring() {
   };
 
   // Handle alert config changes
-  const handleConfigChange = async (changes: any) => {
+  const handleConfigChange = async (changes: Record<string, unknown>) => {
     try {
       const success = await updateAlertConfig(changes);
       

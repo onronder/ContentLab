@@ -17,13 +17,22 @@ interface QuotaUsageProps {
   organizationId: string;
 }
 
+interface QuotaRequest {
+  id: string;
+  created_at: string;
+  request_type: 'analyses' | 'competitors' | 'api_requests' | 'storage';
+  current_limit: number;
+  requested_limit: number;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 export function QuotaUsage({ organizationId }: QuotaUsageProps) {
   const [activeTab, setActiveTab] = useState('limits');
   const [isQuotaRequestDialogOpen, setIsQuotaRequestDialogOpen] = useState(false);
   const [quotaRequestType, setQuotaRequestType] = useState<'analyses' | 'competitors' | 'api_requests' | 'storage'>('analyses');
   const [requestedLimit, setRequestedLimit] = useState<number>(0);
   const [requestReason, setRequestReason] = useState<string>('');
-  const [quotaRequests, setQuotaRequests] = useState<any[]>([]);
+  const [quotaRequests, setQuotaRequests] = useState<QuotaRequest[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   
   const {
@@ -232,7 +241,7 @@ export function QuotaUsage({ organizationId }: QuotaUsageProps) {
                           <Label htmlFor="quota-type">Quota Type</Label>
                           <Select 
                             value={quotaRequestType} 
-                            onValueChange={(val) => setQuotaRequestType(val as any)}
+                            onValueChange={(val) => setQuotaRequestType(val as 'analyses' | 'competitors' | 'api_requests' | 'storage')}
                           >
                             <SelectTrigger id="quota-type">
                               <SelectValue placeholder="Select quota type" />
@@ -260,7 +269,7 @@ export function QuotaUsage({ organizationId }: QuotaUsageProps) {
                             type="number"
                             placeholder="Requested limit"
                             value={requestedLimit || ''}
-                            onChange={(e) => setRequestedLimit(parseInt(e.target.value) || 0)}
+                            onChange={(event) => setRequestedLimit(parseInt(event.target.value) || 0)}
                           />
                         </div>
                         
@@ -270,7 +279,7 @@ export function QuotaUsage({ organizationId }: QuotaUsageProps) {
                             id="reason"
                             placeholder="Please explain why you need this increase"
                             value={requestReason}
-                            onChange={(e) => setRequestReason(e.target.value)}
+                            onChange={(event) => setRequestReason(event.target.value)}
                           />
                         </div>
                       </div>

@@ -32,7 +32,7 @@ export default async function QuotaManagementPage() {
     .order('created_at', { ascending: false });
   
   // Format the data for easier consumption by components
-  const formattedRequests = requests?.map((request: Record<string, any>) => ({
+  const formattedRequests = requests?.map((request) => ({
     id: request.id,
     organizationId: request.organization_id,
     organizationName: request.organizations?.name || 'Unknown Organization',
