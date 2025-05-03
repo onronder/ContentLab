@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ChevronRight, LayoutDashboard, Activity, Server, Database, AlertTriangle } from "lucide-react";
+import { ChevronRight, LayoutDashboard, Activity, Server, Database, AlertTriangle, LineChart } from "lucide-react";
 
 interface AdminNavItemProps {
   href: string;
@@ -53,9 +53,19 @@ export function AdminNavigation() {
       icon: <Database className="h-4 w-4" />,
     },
     {
+      href: "/admin/database",
+      title: "Database Pool",
+      icon: <Database className="h-4 w-4" />,
+    },
+    {
       href: "/admin/monitoring",
       title: "System Monitoring",
       icon: <AlertTriangle className="h-4 w-4" />,
+    },
+    {
+      href: "/admin/analytics",
+      title: "Analytics",
+      icon: <LineChart className="h-4 w-4" />,
     },
   ];
   
