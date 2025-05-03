@@ -219,7 +219,7 @@ export function UsageAnalytics() {
     } finally {
       setIsLoading(false);
     }
-  }, [getDateRange, supabase, toast, withCache, CACHE_EXPIRY]);
+  }, [getDateRange, supabase, toast]);
   
   // Process raw data into analytics format
   const processAnalyticsData = (
@@ -250,7 +250,12 @@ export function UsageAnalytics() {
     });
     
     // Aggregate usage by subscription plan
-    const usageByPlan: Record<string, any> = {};
+    const usageByPlan: Record<string, {
+      analyses: number;
+      apiRequests: number;
+      competitorUrls: number;
+      organizations: number;
+    }> = {};
     Object.keys(orgsByPlan).forEach(plan => {
       const planOrgIds = orgsByPlan[plan].map(org => org.id);
       const planUsage = usageData.filter(item => planOrgIds.includes(item.organization_id));
