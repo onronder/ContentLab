@@ -75,7 +75,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
     "@eslint/eslintrc": "^3",
-    "@opennextjs/cloudflare": "^0.2.1",
+    "@opennextjs/cloudflare": "^0.3.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
