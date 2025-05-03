@@ -111,6 +111,20 @@ $$;
 CREATE OR REPLACE VIEW connection_pool_health AS
 SELECT * FROM monitor_connection_pool();
 
+-- Create a function to safely refresh the materialized view
+CREATE OR REPLACE FUNCTION refresh_connection_pool_stats()
+RETURNS void AS $$
+BEGIN
+    -- Check if the materialized view exists
+    IF EXISTS (
+        SELECT 1 FROM pg_matviews WHERE matviewname = 'connection_pool_stats'
+    ) THEN
+        -- Refresh the materialized view
+        EXECUTE 'REFRESH MATERIALIZED VIEW connection_pool_stats';
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create a scheduled job to refresh pool stats only if pg_cron is available
 DO $$ 
 BEGIN
@@ -123,7 +137,7 @@ BEGIN
             '*/5 * * * *',  -- every 5 minutes
             $$
             -- Refresh the monitoring stats
-            REFRESH MATERIALIZED VIEW IF EXISTS connection_pool_stats;
+            SELECT refresh_connection_pool_stats();
             
             -- Auto-cleanup long-running connections
             CALL reset_connection_pool();
@@ -166,4 +180,5 @@ COMMENT ON FUNCTION monitor_connection_pool() IS 'Provides real-time metrics abo
 COMMENT ON PROCEDURE reset_connection_pool() IS 'Terminates idle connections to free up pool resources';
 COMMENT ON VIEW connection_pool_health IS 'Real-time view of connection pool health metrics';
 COMMENT ON MATERIALIZED VIEW connection_pool_stats IS 'Historical record of connection pool metrics';
-COMMENT ON FUNCTION pg_track_connection_context(text, text, text) IS 'Tracks application-specific context for connections'; 
+COMMENT ON FUNCTION pg_track_connection_context(text, text, text) IS 'Tracks application-specific context for connections';
+COMMENT ON FUNCTION refresh_connection_pool_stats() IS 'Safely refreshes the connection pool statistics materialized view'; 
