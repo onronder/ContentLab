@@ -166,7 +166,7 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
     if (!organizationId) return [];
     
     try {
-      const { data, error } = await supabase
+      const { data: requestsData, error } = await supabase
         .from('quota_increase_requests')
         .select(`
           id, 
@@ -199,7 +199,7 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
         reviewed_at: string | null;
       }
       
-      const requests: QuotaRequest[] = (data || []).map((item: RawQuotaRequest) => ({
+      const requests: QuotaRequest[] = (requestsData || []).map((item: RawQuotaRequest) => ({
         id: item.id,
         request_type: item.request_type,
         current_limit: item.current_limit,

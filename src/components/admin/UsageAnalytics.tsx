@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { withCache, CACHE_EXPIRY } from '@/lib/cache';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -147,7 +147,7 @@ export function UsageAnalytics() {
   };
   
   // Fetch analytics data based on selected date range
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
     
     try {
@@ -194,7 +194,7 @@ export function UsageAnalytics() {
           // Process and aggregate data for charts and stats
           const processedData = processAnalyticsData(
             usageData as UsageData[], 
-            orgData as OrganizationData[], 
+            orgData as unknown as OrganizationData[], 
             quotaRequests as QuotaRequestData[]
           );
           
@@ -219,7 +219,7 @@ export function UsageAnalytics() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getDateRange, supabase, toast, withCache, CACHE_EXPIRY]);
   
   // Process raw data into analytics format
   const processAnalyticsData = (
@@ -371,7 +371,10 @@ export function UsageAnalytics() {
             </CardDescription>
           </div>
           <div className="flex items-center space-x-2">
-            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+            <Select 
+              value={dateRange} 
+              onValueChange={(value: "7days" | "30days" | "thisMonth" | "custom") => setDateRange(value)}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select date range" />
               </SelectTrigger>
@@ -543,7 +546,12 @@ export function UsageAnalytics() {
                           </tr>
                         </thead>
                         <tbody>
-                          {analyticsData.dailyUsage.map((day: any, index: number) => (
+                          {analyticsData.dailyUsage.map((day: {
+                            date: string;
+                            analyses: number;
+                            apiRequests: number;
+                            competitorUrls: number;
+                          }, index: number) => (
                             <tr key={index} className="border-b">
                               <td className="py-2 px-4">{format(new Date(day.date), 'MMM d, yyyy')}</td>
                               <td className="py-2 px-4">{day.analyses}</td>
@@ -575,7 +583,7 @@ export function UsageAnalytics() {
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(analyticsData.quotaRequestsByType).map(([type, count]: [string, any]) => (
+                            {Object.entries(analyticsData.quotaRequestsByType).map(([type, count]: [string, number]) => (
                               <tr key={type} className="border-b">
                                 <td className="py-2 px-4">{getRequestTypeName(type)}</td>
                                 <td className="py-2 px-4">{count}</td>
@@ -602,7 +610,7 @@ export function UsageAnalytics() {
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(analyticsData.quotaRequestsByStatus).map(([status, count]: [string, any]) => (
+                            {Object.entries(analyticsData.quotaRequestsByStatus).map(([status, count]: [string, number]) => (
                               <tr key={status} className="border-b">
                                 <td className="py-2 px-4 capitalize">{status}</td>
                                 <td className="py-2 px-4">{count}</td>
@@ -634,7 +642,12 @@ export function UsageAnalytics() {
                           </tr>
                         </thead>
                         <tbody>
-                          {Object.entries(analyticsData.usageByPlan).map(([plan, data]: [string, any]) => (
+                          {Object.entries(analyticsData.usageByPlan).map(([plan, data]: [string, {
+                            analyses: number;
+                            apiRequests: number;
+                            competitorUrls: number;
+                            organizations: number;
+                          }]) => (
                             <tr key={plan} className="border-b">
                               <td className="py-2 px-4 capitalize">{plan}</td>
                               <td className="py-2 px-4">{data.organizations}</td>

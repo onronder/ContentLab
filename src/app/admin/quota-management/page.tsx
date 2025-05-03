@@ -24,17 +24,8 @@ interface FormattedQuotaRequest {
 }
 
 // Define types for nested response structures
-interface Organization {
-  name: string | null;
-}
-
 interface RequestUser {
   email: string | null;
-}
-
-interface AuthUsers {
-  users_quota_increase_requests_requested_by_fkey?: RequestUser;
-  users_quota_increase_requests_reviewed_by_fkey?: RequestUser;
 }
 
 export default async function QuotaManagementPage() {
