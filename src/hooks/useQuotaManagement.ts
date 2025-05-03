@@ -135,7 +135,7 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
     if (!organizationId) return false;
     
     try {
-      const { data, error } = await supabase.rpc('request_quota_increase', {
+      const { error } = await supabase.rpc('request_quota_increase', {
         p_organization_id: organizationId,
         p_request_type: type,
         p_requested_limit: requestedLimit,
