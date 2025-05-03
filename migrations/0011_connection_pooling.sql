@@ -1,6 +1,21 @@
 -- Migration for database connection pooling setup
 -- We'll configure pgbouncer settings for efficient connection pooling
 
+-- First, check if pg_cron extension exists and create it if not
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+    ) THEN
+        -- Create the extension if you have permission
+        BEGIN
+            CREATE EXTENSION pg_cron;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Could not create pg_cron extension. You may need admin privileges: %', SQLERRM;
+        END;
+    END IF;
+END $$;
+
 -- Create a function to check and set pgbouncer configuration
 CREATE OR REPLACE FUNCTION set_connection_pool_config()
 RETURNS void AS $$
@@ -96,18 +111,28 @@ $$;
 CREATE OR REPLACE VIEW connection_pool_health AS
 SELECT * FROM monitor_connection_pool();
 
--- Create a scheduled job to refresh pool stats
-SELECT cron.schedule(
-    'refresh-connection-pool-stats',
-    '*/5 * * * *',  -- every 5 minutes
-    $$
-    -- Refresh the monitoring stats
-    REFRESH MATERIALIZED VIEW IF EXISTS connection_pool_stats;
-    
-    -- Auto-cleanup long-running connections
-    CALL reset_connection_pool();
-    $$
-);
+-- Create a scheduled job to refresh pool stats only if pg_cron is available
+DO $$ 
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+    ) THEN
+        -- Schedule the job only if pg_cron exists
+        PERFORM cron.schedule(
+            'refresh-connection-pool-stats',
+            '*/5 * * * *',  -- every 5 minutes
+            $$
+            -- Refresh the monitoring stats
+            REFRESH MATERIALIZED VIEW IF EXISTS connection_pool_stats;
+            
+            -- Auto-cleanup long-running connections
+            CALL reset_connection_pool();
+            $$
+        );
+    ELSE
+        RAISE NOTICE 'pg_cron extension is not available. Scheduled jobs will not be created.';
+    END IF;
+END $$;
 
 -- Create a materialized view to store historical pool data
 CREATE MATERIALIZED VIEW IF NOT EXISTS connection_pool_stats AS

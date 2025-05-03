@@ -5,7 +5,8 @@ import {
   getConnectionPoolStats, 
   getConnectionPoolHistory, 
   resetConnectionPool,
-  configureConnectionPool 
+  configureConnectionPool,
+  checkDatabaseExtensions
 } from '@/app/api/db-config';
 
 /**
@@ -66,9 +67,13 @@ export async function GET(request: NextRequest) {
   const currentStats = await getConnectionPoolStats();
   const history = await getConnectionPoolHistory(historyHours);
   
+  // Check database extensions
+  const extensions = await checkDatabaseExtensions();
+  
   return NextResponse.json({
     current: currentStats,
     history: history,
+    extensions: extensions,
     timestamp: new Date().toISOString()
   });
 }

@@ -21,10 +21,22 @@ type HistoricalStats = ConnectionPoolStats & {
   recorded_at: string;
 };
 
+type ExtensionStatus = {
+  pgCron: boolean;
+  pgBouncer: boolean;
+};
+
 type PoolData = {
   current: ConnectionPoolStats;
   history: HistoricalStats[];
+  extensions: ExtensionStatus;
   timestamp: string;
+};
+
+type ApiResponse = {
+  error?: string;
+  success?: boolean;
+  message?: string;
 };
 
 export default function ConnectionPoolManager() {
@@ -33,6 +45,10 @@ export default function ConnectionPoolManager() {
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [timeRange, setTimeRange] = useState<string>('24h');
+  const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>({ 
+    pgCron: false, 
+    pgBouncer: false 
+  });
 
   // Fetch connection pool data
   const fetchPoolData = async (hours: number = 24) => {
@@ -46,8 +62,16 @@ export default function ConnectionPoolManager() {
         throw new Error(`Error fetching connection pool data: ${response.statusText}`);
       }
       
-      const data = await response.json();
+      const data = await response.json() as PoolData;
       setPoolData(data);
+
+      // Check for extension availability
+      if (data.extensions) {
+        setExtensionStatus({
+          pgCron: !!data.extensions.pg_cron,
+          pgBouncer: !!data.extensions.pgbouncer
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       console.error('Error fetching connection pool data:', err);
@@ -70,7 +94,7 @@ export default function ConnectionPoolManager() {
         body: JSON.stringify({ action: 'reset' }),
       });
       
-      const result = await response.json();
+      const result = await response.json() as ApiResponse;
       
       if (!response.ok) {
         throw new Error(result.error || 'Failed to reset connection pool');
@@ -108,7 +132,7 @@ export default function ConnectionPoolManager() {
         body: JSON.stringify({ action: 'configure' }),
       });
       
-      const result = await response.json();
+      const result = await response.json() as ApiResponse;
       
       if (!response.ok) {
         throw new Error(result.error || 'Failed to configure connection pool');
@@ -185,6 +209,16 @@ export default function ConnectionPoolManager() {
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {!extensionStatus.pgCron && poolData && (
+        <Alert>
+          <AlertTitle>Extension Missing</AlertTitle>
+          <AlertDescription>
+            The pg_cron extension is not enabled. Scheduled database maintenance tasks will not run automatically.
+            You may need to request this extension from your database administrator.
+          </AlertDescription>
         </Alert>
       )}
       

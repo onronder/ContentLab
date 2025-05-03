@@ -20,6 +20,35 @@ export async function trackDatabaseConnection(userId: string, sessionId: string)
 }
 
 /**
+ * Check which database extensions are available
+ */
+export async function checkDatabaseExtensions() {
+  try {
+    const extensions = await executeQuery(
+      'SELECT extname FROM pg_extension'
+    );
+    
+    const extensionMap: Record<string, boolean> = {};
+    
+    // Convert array of extensions to a map for easy checking
+    extensions.forEach((ext: { extname: string }) => {
+      extensionMap[ext.extname] = true;
+    });
+    
+    return {
+      pg_cron: !!extensionMap['pg_cron'],
+      pgbouncer: !!extensionMap['pgbouncer']
+    };
+  } catch (error) {
+    console.error('Error checking database extensions:', error);
+    return {
+      pg_cron: false,
+      pgbouncer: false
+    };
+  }
+}
+
+/**
  * Get current connection pool stats
  */
 export async function getConnectionPoolStats() {
