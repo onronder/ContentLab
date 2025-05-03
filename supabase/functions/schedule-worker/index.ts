@@ -1,3 +1,4 @@
+// @ts-nocheck - Supabase Edge Functions use Deno runtime which TypeScript can't properly type check
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 /**

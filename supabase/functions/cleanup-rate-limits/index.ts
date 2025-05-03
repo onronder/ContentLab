@@ -1,6 +1,8 @@
 // Follow this setup guide to integrate the Deno runtime into your application:
 // https://deno.land/manual/examples/supabase_oauth
 
+// @ts-nocheck
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -55,7 +57,7 @@ serve(async (req) => {
   } catch (err) {
     console.error('Error in cleanup function:', err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: (err as Error).message }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500 

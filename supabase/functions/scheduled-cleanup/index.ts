@@ -1,6 +1,6 @@
-// @ts-ignore - Deno specific imports
+// @ts-nocheck - Supabase Edge Functions use Deno runtime which TypeScript can't properly type check
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore - Deno specific imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -17,9 +17,7 @@ serve(async (req: Request) => {
   try {
     // Create a Supabase client with the auth admin key
     const supabaseAdmin = createClient(
-      // @ts-ignore - Deno specific
       Deno.env.get("SUPABASE_URL") ?? "",
-      // @ts-ignore - Deno specific
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       {
         auth: {

@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Content Roadmap Tool
 
-## Getting Started
+A tool for analyzing content against competitors to find gaps and popular themes.
 
-First, run the development server:
+## Deployment on Vercel
+
+This project is configured for easy deployment on Vercel with GitHub integration.
+
+### Prerequisites
+
+1. A [Supabase](https://supabase.com/) project with Edge Functions enabled
+2. A [Vercel](https://vercel.com/) account connected to your GitHub repository
+
+### Environment Variables
+
+Set up the following environment variables in your Vercel project settings:
+
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anon/public key
+
+Optional:
+- `RATE_LIMIT_REQUESTS` - Number of requests allowed in the window (default: 10)
+- `RATE_LIMIT_WINDOW_SECONDS` - Time window for rate limiting in seconds (default: 60)
+- `WORKER_WEBHOOK_SECRET` - Secret for worker webhook authentication
+- `ADMIN_EMAIL` - Email for admin alerts
+- `ALERT_WEBHOOK_URL` - URL for alert webhooks
+
+### Deployment Steps
+
+1. Push your code to GitHub
+2. Import your repository in Vercel
+3. Configure the environment variables
+4. Deploy!
+
+### Supabase Edge Functions
+
+This project uses several Supabase Edge Functions:
+
+- `analyze` - Main content analysis function
+- `get-report` - Retrieves analysis results
+- `worker` - Background processing worker
+- `worker-heartbeat` - Worker health monitoring
+- `worker-health-check` - System health monitoring
+- `schedule-worker` - Scheduled worker invocation
+- `data-management` - Data archiving and cleanup
+- `cleanup-rate-limits` - Rate limit data cleanup
+- `job-alerts` - System alerting
+- `scheduled-alerts` - Scheduled system checks
+- `scheduled-cleanup` - Scheduled data cleanup
+
+Make sure all edge functions are deployed to Supabase using:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+supabase functions deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Install dependencies
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run development server
+npm run dev
+```
 
-## Learn More
+## License
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT](LICENSE)

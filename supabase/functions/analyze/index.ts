@@ -1,8 +1,11 @@
 // Follow this setup guide to integrate the Deno language server with your editor:
 // https://deno.land/manual/getting_started/setup_your_environment
 // This enables autocomplete, go to definition, etc.
-// Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+// TypeScript ignore directive for Deno-specific imports
+// @ts-nocheck
+
+// Import statements for Deno runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
 import { cors } from 'https://deno.land/x/cors/mod.ts';
@@ -83,6 +86,16 @@ interface Topic {
   score: number;
   inUser: boolean;
   inCompetitors: number;
+}
+
+// Type definitions for DOM operations
+type DOMElement = any;
+
+// Type for HTTP request
+interface EdgeRequest extends Request {
+  method: string;
+  headers: Headers;
+  json(): Promise<any>;
 }
 
 // ---- Web Scraping Functions ----
@@ -384,7 +397,7 @@ function analyzeContent(userContent: ScrapingResult, competitorContents: Scrapin
 async function runAnalysis(
   supabaseClient: any,
   payload: RequestPayload,
-  userId?: string,
+  userId: string | undefined,
   jobId?: string
 ): Promise<{ status: number; body: any }> {
   try {
@@ -542,7 +555,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-Deno.serve(async (req) => {
+// Deno serve function
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -558,7 +572,7 @@ Deno.serve(async (req) => {
     
     // Create Supabase client
     let supabaseClient;
-    let userId = null;
+    let userId: string | undefined = undefined;
     
     if (isWorkerRequest) {
       // Use service role key for worker requests
