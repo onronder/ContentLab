@@ -125,6 +125,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create a combined maintenance function for all pool tasks
+CREATE OR REPLACE FUNCTION maintain_connection_pool()
+RETURNS void AS $$
+BEGIN
+    -- Refresh the stats
+    PERFORM refresh_connection_pool_stats();
+    
+    -- Run the connection pool reset
+    CALL reset_connection_pool();
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create a scheduled job to refresh pool stats only if pg_cron is available
 DO $$ 
 BEGIN
@@ -135,13 +147,7 @@ BEGIN
         PERFORM cron.schedule(
             'refresh-connection-pool-stats',
             '*/5 * * * *',  -- every 5 minutes
-            $$
-            -- Refresh the monitoring stats
-            SELECT refresh_connection_pool_stats();
-            
-            -- Auto-cleanup long-running connections
-            CALL reset_connection_pool();
-            $$
+            'DO $$ BEGIN PERFORM maintain_connection_pool(); END $$;'
         );
     ELSE
         RAISE NOTICE 'pg_cron extension is not available. Scheduled jobs will not be created.';
@@ -181,4 +187,5 @@ COMMENT ON PROCEDURE reset_connection_pool() IS 'Terminates idle connections to 
 COMMENT ON VIEW connection_pool_health IS 'Real-time view of connection pool health metrics';
 COMMENT ON MATERIALIZED VIEW connection_pool_stats IS 'Historical record of connection pool metrics';
 COMMENT ON FUNCTION pg_track_connection_context(text, text, text) IS 'Tracks application-specific context for connections';
-COMMENT ON FUNCTION refresh_connection_pool_stats() IS 'Safely refreshes the connection pool statistics materialized view'; 
+COMMENT ON FUNCTION refresh_connection_pool_stats() IS 'Safely refreshes the connection pool statistics materialized view';
+COMMENT ON FUNCTION maintain_connection_pool() IS 'Combined maintenance function for connection pool operations'; 
