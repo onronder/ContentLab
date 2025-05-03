@@ -7,6 +7,22 @@ export const metadata = {
   description: 'Manage quota increase requests and organization quotas',
 };
 
+// Define the expected quota request format for components
+interface FormattedQuotaRequest {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  requestedBy: string;
+  requestType: string;
+  currentLimit: number;
+  requestedLimit: number;
+  reason: string;
+  status: string;
+  createdAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+
 export default async function QuotaManagementPage() {
   const supabase = createServerSupabaseClient();
   
@@ -32,20 +48,35 @@ export default async function QuotaManagementPage() {
     .order('created_at', { ascending: false });
   
   // Format the data for easier consumption by components
-  const formattedRequests = requests?.map((request) => ({
-    id: request.id,
-    organizationId: request.organization_id,
-    organizationName: request.organizations?.name || 'Unknown Organization',
-    requestedBy: request.auth?.users_quota_increase_requests_requested_by_fkey?.email || 'Unknown',
-    requestType: request.request_type,
-    currentLimit: request.current_limit,
-    requestedLimit: request.requested_limit,
-    reason: request.reason || '',
-    status: request.status,
-    createdAt: request.created_at,
-    reviewedBy: request.auth?.users_quota_increase_requests_reviewed_by_fkey?.email || null,
-    reviewedAt: request.reviewed_at || null,
-  })) || [];
+  const formattedRequests: FormattedQuotaRequest[] = [];
+  
+  if (requests) {
+    for (const request of requests) {
+      // Type safety with manual property access
+      const item = request as Record<string, any>;
+      const organizations = item.organizations as Record<string, any> | null;
+      const auth = item.auth as Record<string, any> | null;
+      
+      formattedRequests.push({
+        id: String(item.id || ''),
+        organizationId: String(item.organization_id || ''),
+        organizationName: organizations?.name ? String(organizations.name) : 'Unknown Organization',
+        requestedBy: auth?.users_quota_increase_requests_requested_by_fkey?.email 
+          ? String(auth.users_quota_increase_requests_requested_by_fkey.email)
+          : 'Unknown',
+        requestType: String(item.request_type || ''),
+        currentLimit: Number(item.current_limit || 0),
+        requestedLimit: Number(item.requested_limit || 0),
+        reason: String(item.reason || ''),
+        status: String(item.status || ''),
+        createdAt: String(item.created_at || ''),
+        reviewedBy: auth?.users_quota_increase_requests_reviewed_by_fkey?.email 
+          ? String(auth.users_quota_increase_requests_reviewed_by_fkey.email)
+          : null,
+        reviewedAt: item.reviewed_at ? String(item.reviewed_at) : null,
+      });
+    }
+  }
   
   return (
     <div className="space-y-6 p-6">

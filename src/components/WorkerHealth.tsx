@@ -102,7 +102,7 @@ export default function WorkerHealth() {
       if (workersError) throw workersError;
 
       setWorkers(workersData || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading workers:', err);
       setError('Failed to load worker data. Please try again.');
     } finally {
@@ -140,7 +140,7 @@ export default function WorkerHealth() {
             failed_jobs: jobStats?.failed || 0,
             avg_processing_time: avgTimeData?.avg_time || null,
           });
-        } catch (err) {
+        } catch (err: unknown) {
           console.error('Error loading system stats:', err);
           // Don't set error state here to allow partial UI rendering
         }
@@ -161,7 +161,7 @@ export default function WorkerHealth() {
       setTimeout(() => {
         loadWorkers();
       }, 2000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error checking worker health:', err);
       setError('Failed to check worker health. Please try again.');
     }

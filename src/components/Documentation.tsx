@@ -38,7 +38,7 @@ export function Documentation({
         }
         
         setDocs(result);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching documentation:', error);
       } finally {
         setLoading(false);

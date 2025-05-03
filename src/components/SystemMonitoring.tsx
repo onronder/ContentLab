@@ -130,7 +130,7 @@ export default function SystemMonitoring() {
       });
       
       setAlertsRefreshTrigger(prev => prev + 1);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error checking alerts:", err);
     }
   };
@@ -145,7 +145,7 @@ export default function SystemMonitoring() {
       } else {
         toast.error("Failed to update configuration");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error updating alert config:", err);
       toast.error("Failed to update configuration");
     }

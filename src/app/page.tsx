@@ -150,7 +150,7 @@ export default function Home() {
             setError(result.error_message || "Analysis failed with an unknown error.");
           }
         }
-      } catch (pollError) {
+      } catch (pollError: unknown) {
         console.error("Polling error:", pollError);
         clearInterval(pollingIntervalRef.current!);
         pollingIntervalRef.current = null;
@@ -264,7 +264,7 @@ export default function Home() {
       });
       pollForResult(data.job_id);
 
-    } catch (apiError) {
+    } catch (apiError: unknown) {
       console.error("Analysis initiation error:", apiError);
       setError(apiError instanceof Error ? apiError.message : "Failed to initiate analysis.");
       setIsLoading(false);
