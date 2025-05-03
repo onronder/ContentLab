@@ -36,14 +36,15 @@ jobs:
           run_install: false
 
       - name: Get pnpm store directory
+        id: pnpm-store
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
         name: Setup pnpm cache
         with:
-          path: ${{ env.STORE_PATH }}
+          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
@@ -51,8 +52,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Create dummy env file for CI
+        run: |
+          touch .env.local
+          echo "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co" >> .env.local
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy-key-for-ci" >> .env.local
+
       - name: Build application
-        run: pnpm build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }} 
+        run: pnpm build 
