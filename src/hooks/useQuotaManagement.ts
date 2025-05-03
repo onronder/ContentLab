@@ -186,7 +186,20 @@ export function useQuotaManagement(organizationId?: string): QuotaManagementRetu
       if (error) throw error;
       
       // Transform the data to match the QuotaRequest interface
-      const requests: QuotaRequest[] = (data || []).map((item: any) => ({
+      interface RawQuotaRequest {
+        id: string;
+        request_type: string;
+        current_limit: number;
+        requested_limit: number;
+        reason: string;
+        status: string;
+        created_at: string;
+        requested_by: Array<{ email: string }> | null;
+        reviewed_by: Array<{ email: string }> | null;
+        reviewed_at: string | null;
+      }
+      
+      const requests: QuotaRequest[] = (data || []).map((item: RawQuotaRequest) => ({
         id: item.id,
         request_type: item.request_type,
         current_limit: item.current_limit,

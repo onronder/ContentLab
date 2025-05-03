@@ -23,6 +23,20 @@ interface FormattedQuotaRequest {
   reviewedAt: string | null;
 }
 
+// Define types for nested response structures
+interface Organization {
+  name: string | null;
+}
+
+interface RequestUser {
+  email: string | null;
+}
+
+interface AuthUsers {
+  users_quota_increase_requests_requested_by_fkey?: RequestUser;
+  users_quota_increase_requests_reviewed_by_fkey?: RequestUser;
+}
+
 export default async function QuotaManagementPage() {
   const supabase = createServerSupabaseClient();
   
@@ -51,31 +65,79 @@ export default async function QuotaManagementPage() {
   const formattedRequests: FormattedQuotaRequest[] = [];
   
   if (requests) {
-    for (const request of requests) {
-      // Type safety with manual property access
-      const item = request as Record<string, any>;
-      const organizations = item.organizations as Record<string, any> | null;
-      const auth = item.auth as Record<string, any> | null;
-      
-      formattedRequests.push({
-        id: String(item.id || ''),
-        organizationId: String(item.organization_id || ''),
-        organizationName: organizations?.name ? String(organizations.name) : 'Unknown Organization',
-        requestedBy: auth?.users_quota_increase_requests_requested_by_fkey?.email 
-          ? String(auth.users_quota_increase_requests_requested_by_fkey.email)
-          : 'Unknown',
-        requestType: String(item.request_type || ''),
-        currentLimit: Number(item.current_limit || 0),
-        requestedLimit: Number(item.requested_limit || 0),
-        reason: String(item.reason || ''),
-        status: String(item.status || ''),
-        createdAt: String(item.created_at || ''),
-        reviewedBy: auth?.users_quota_increase_requests_reviewed_by_fkey?.email 
-          ? String(auth.users_quota_increase_requests_reviewed_by_fkey.email)
-          : null,
-        reviewedAt: item.reviewed_at ? String(item.reviewed_at) : null,
-      });
-    }
+    // Handle each request safely with appropriate type checks
+    requests.forEach((request) => {
+      try {
+        // Safely extract properties with type checking
+        const id = typeof request.id === 'string' ? request.id : '';
+        const organization_id = typeof request.organization_id === 'string' ? request.organization_id : '';
+        const request_type = typeof request.request_type === 'string' ? request.request_type : '';
+        const current_limit = typeof request.current_limit === 'number' ? request.current_limit : 0;
+        const requested_limit = typeof request.requested_limit === 'number' ? request.requested_limit : 0;
+        const reason = typeof request.reason === 'string' ? request.reason : '';
+        const status = typeof request.status === 'string' ? request.status : '';
+        const created_at = typeof request.created_at === 'string' ? request.created_at : '';
+        const reviewed_at = typeof request.reviewed_at === 'string' ? request.reviewed_at : null;
+        
+        // Extract nested properties safely
+        let organizationName = 'Unknown Organization';
+        if (request.organizations && typeof request.organizations === 'object' && request.organizations !== null) {
+          const org = request.organizations;
+          if ('name' in org && typeof org.name === 'string') {
+            organizationName = org.name;
+          }
+        }
+        
+        // Extract requested_by email
+        let requestedBy = 'Unknown';
+        if (request.auth && typeof request.auth === 'object' && request.auth !== null) {
+          const auth = request.auth;
+          if ('users_quota_increase_requests_requested_by_fkey' in auth && 
+              auth.users_quota_increase_requests_requested_by_fkey && 
+              typeof auth.users_quota_increase_requests_requested_by_fkey === 'object' && 
+              auth.users_quota_increase_requests_requested_by_fkey !== null) {
+            const user = auth.users_quota_increase_requests_requested_by_fkey;
+            if ('email' in user && typeof user.email === 'string') {
+              requestedBy = user.email;
+            }
+          }
+        }
+        
+        // Extract reviewed_by email
+        let reviewedBy = null;
+        if (request.auth && typeof request.auth === 'object' && request.auth !== null) {
+          const auth = request.auth;
+          if ('users_quota_increase_requests_reviewed_by_fkey' in auth && 
+              auth.users_quota_increase_requests_reviewed_by_fkey && 
+              typeof auth.users_quota_increase_requests_reviewed_by_fkey === 'object' && 
+              auth.users_quota_increase_requests_reviewed_by_fkey !== null) {
+            const reviewer = auth.users_quota_increase_requests_reviewed_by_fkey;
+            if ('email' in reviewer && typeof reviewer.email === 'string') {
+              reviewedBy = reviewer.email;
+            }
+          }
+        }
+        
+        // Add formatted request to the array
+        formattedRequests.push({
+          id,
+          organizationId: organization_id,
+          organizationName,
+          requestedBy,
+          requestType: request_type,
+          currentLimit: current_limit,
+          requestedLimit: requested_limit,
+          reason: reason || '',
+          status,
+          createdAt: created_at,
+          reviewedBy,
+          reviewedAt: reviewed_at,
+        });
+      } catch (err) {
+        console.error('Error processing quota request:', err);
+        // Continue to next request if there's an error
+      }
+    });
   }
   
   return (

@@ -148,7 +148,7 @@ export default function WorkerHealth() {
       
       loadSystemStats();
     }
-  }, [workers, supabase]);
+  }, [workers]);
 
   // Check for stale workers and trigger a worker health check
   const checkWorkerHealth = async () => {

@@ -32,10 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ArrowUpDown,
   BarChart3,
-  PieChart,
-  LineChart,
   Users,
-  Clock,
   AlertTriangle,
   Download
 } from 'lucide-react';
@@ -56,13 +53,72 @@ interface ChartData {
   }[];
 }
 
+// Define the types for usage data
+interface UsageData {
+  date: string;
+  organization_id: string;
+  analyses_count: number;
+  api_requests_count: number;
+  competitor_urls_count: number;
+}
+
+// Define the types for organization data
+interface OrganizationData {
+  id: string;
+  name: string;
+  subscription_plan_id: string;
+  subscription_plans: {
+    name: string;
+  } | null;
+}
+
+// Define the types for quota request data
+interface QuotaRequestData {
+  id: string;
+  organization_id: string;
+  request_type: string;
+  current_limit: number;
+  requested_limit: number;
+  status: string;
+  created_at: string;
+}
+
+// Define the structure for processed analytics data
+interface AnalyticsData {
+  dailyUsage: Array<{
+    date: string;
+    analyses: number;
+    apiRequests: number;
+    competitorUrls: number;
+  }>;
+  usageByPlan: Record<string, {
+    analyses: number;
+    apiRequests: number;
+    competitorUrls: number;
+    organizations: number;
+  }>;
+  totalUsage: {
+    analyses: number;
+    apiRequests: number;
+    competitorUrls: number;
+  };
+  quotaRequestsByType: Record<string, number>;
+  quotaRequestsByStatus: Record<string, number>;
+  usageChartData: ChartData;
+  planDistributionData: ChartData;
+  quotaRequestsData: ChartData;
+  orgsByPlan: Record<string, OrganizationData[]>;
+  totalOrganizations: number;
+  totalQuotaRequests: number;
+}
+
 export function UsageAnalytics() {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState<'7days' | '30days' | 'thisMonth' | 'custom'>('7days');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(subDays(new Date(), 7));
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(true);
-  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const { toast } = useToast();
   const supabase = createClient();
   
@@ -136,7 +192,11 @@ export function UsageAnalytics() {
           if (quotaError) throw quotaError;
           
           // Process and aggregate data for charts and stats
-          const processedData = processAnalyticsData(usageData, orgData, quotaRequests);
+          const processedData = processAnalyticsData(
+            usageData as UsageData[], 
+            orgData as OrganizationData[], 
+            quotaRequests as QuotaRequestData[]
+          );
           
           return processedData;
         },
@@ -162,9 +222,13 @@ export function UsageAnalytics() {
   };
   
   // Process raw data into analytics format
-  const processAnalyticsData = (usageData: any[], orgData: any[], quotaRequests: any[]) => {
+  const processAnalyticsData = (
+    usageData: UsageData[], 
+    orgData: OrganizationData[], 
+    quotaRequests: QuotaRequestData[]
+  ): AnalyticsData => {
     // Group organizations by subscription plan
-    const orgsByPlan: Record<string, any[]> = {};
+    const orgsByPlan: Record<string, OrganizationData[]> = {};
     orgData.forEach(org => {
       const planName = org.subscription_plans?.name || 'unknown';
       orgsByPlan[planName] = orgsByPlan[planName] || [];
@@ -294,7 +358,7 @@ export function UsageAnalytics() {
   // Fetch data when date range changes
   useEffect(() => {
     fetchAnalytics();
-  }, [dateRange, customStartDate, customEndDate]);
+  }, [dateRange, customStartDate, customEndDate, fetchAnalytics]);
   
   return (
     <Card className="w-full">

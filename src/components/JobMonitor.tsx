@@ -157,43 +157,42 @@ export default function JobMonitor() {
     try {
       setLoading(true);
       setError(null);
-
+      
+      // Calculate page offset
+      const offset = (currentPage - 1) * jobsPerPage;
+      
       // Get total count first
       const { count, error: countError } = await supabase
         .from('analysis_jobs')
         .select('*', { count: 'exact', head: true });
       
       if (countError) throw countError;
+      
       setTotalJobs(count || 0);
-
-      // Determine range for pagination
-      const from = (currentPage - 1) * jobsPerPage;
-      const to = from + jobsPerPage - 1;
-
-      // Fetch jobs with pagination
+      
+      // Then fetch actual data with pagination
       const { data: jobsData, error: jobsError } = await supabase
         .from('analysis_jobs')
         .select('*')
-        .order('priority', { ascending: false })
         .order('created_at', { ascending: false })
-        .range(from, to);
-
+        .range(offset, offset + jobsPerPage - 1);
+      
       if (jobsError) throw jobsError;
-
-      // Set the jobs
+      
       setJobs(jobsData || []);
-
-      // If we have jobs and no selected job, select the first one
+      
+      // Auto-select first job if none selected
       if (jobsData && jobsData.length > 0 && !selectedJobId) {
         setSelectedJobId(jobsData[0].id);
       }
+      
     } catch (err) {
       console.error('Error loading jobs:', err);
       setError('Failed to load jobs. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [currentPage, jobsPerPage, selectedJobId, supabase]);
+  }, [currentPage, jobsPerPage, selectedJobId]);
 
   // Load job history for a specific job
   const loadJobHistory = useCallback(async (jobId: string) => {
@@ -215,7 +214,7 @@ export default function JobMonitor() {
     } catch (err) {
       console.error(`Error loading history for job ${jobId}:`, err);
     }
-  }, [supabase]);
+  }, []);
 
   // Cancel a job
   const cancelJob = async (jobId: string) => {
@@ -349,7 +348,7 @@ export default function JobMonitor() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [currentPage, loadJobs, loadJobHistory, selectedJobId, supabase]);
+  }, [currentPage, loadJobs, loadJobHistory, selectedJobId]);
 
   // Add pagination controls
   const Pagination = () => {
