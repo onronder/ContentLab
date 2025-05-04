@@ -43,7 +43,7 @@
   },
   "crons": [
     {
-      "path": "/api/cron/autoscaling/route",
+      "path": "app/api/**/*.ts",
       "schedule": "*/15 * * * *"
     }
   ],
