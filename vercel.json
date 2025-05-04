@@ -35,12 +35,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/cron/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "crons": [
     {
       "path": "/api/cron/autoscaling",
