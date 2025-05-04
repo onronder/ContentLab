@@ -100,7 +100,7 @@ export async function GET() {
       if (!worker) {
         // Create worker record for this region if it doesn't exist
         try {
-          const { data: _newWorker, error: createError } = await supabase
+          const { error: createError } = await supabase
             .from('worker_regions')
             .insert({
               region,
@@ -152,7 +152,7 @@ export async function GET() {
       if (significantChange) {
         try {
           // Update worker count
-          const { data: _updatedWorker, error: updateError } = await supabase
+          const { error: updateError } = await supabase
             .from('worker_regions')
             .update({
               active_workers: idealWorkers,

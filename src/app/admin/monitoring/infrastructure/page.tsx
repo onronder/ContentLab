@@ -38,20 +38,20 @@ export default async function InfrastructureMonitoringPage() {
   const supabase = createServerSupabaseClient();
   
   // Fetch region status
-  const { data: regionData, error: _regionError } = await supabase
+  const { data: regionData } = await supabase
     .from('region_status')
     .select('*')
     .order('region', { ascending: true });
     
   // Fetch recent scaling events
-  const { data: scalingHistoryData, error: _scalingError } = await supabase
+  const { data: scalingHistoryData } = await supabase
     .from('autoscaling_history')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(10);
     
   // Fetch traffic metrics
-  const { data: trafficData, error: _trafficError } = await supabase
+  const { data: trafficData } = await supabase
     .from('traffic_analytics')
     .select('*')
     .order('hour', { ascending: false })

@@ -3,7 +3,7 @@ import { Ratelimit } from '@upstash/ratelimit';
 
 // Create Redis client for distributed caching and rate limiting
 let redis: Redis | null = null;
-let rateLimiter: Record<string, Ratelimit> = {};
+const rateLimiter: Record<string, Ratelimit> = {};
 let redisEnabled = false;
 
 // Create a minimal interface that matches the Redis methods we actually use
@@ -15,6 +15,15 @@ interface MinimalRedisClient {
   del(key: string): Promise<number>;
   keys(pattern: string): Promise<string[]>;
   ping(): Promise<string>;
+}
+
+interface DummyRateLimiter {
+  limit: (identifier: string) => Promise<{
+    success: boolean;
+    remaining: number;
+    limit: number;
+    reset: number;
+  }>;
 }
 
 /**
@@ -139,7 +148,7 @@ export function getRateLimiter(planType: 'free' | 'starter' | 'pro' | 'enterpris
       // Return a dummy rate limiter that always allows requests
       rateLimiter[planType] = {
         limit: async () => ({ success: true, remaining: 1000, limit: 1000, reset: Date.now() + 60000 })
-      } as any;
+      } as DummyRateLimiter as Ratelimit;
     }
   }
 

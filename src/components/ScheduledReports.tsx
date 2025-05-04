@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
-import { PlusIcon, TrashIcon, ChevronDownIcon, RefreshIcon } from '@heroicons/react/outline';
+import { PlusIcon, TrashIcon, RefreshIcon } from '@heroicons/react/outline';
 import { format } from 'date-fns';
 
 // Report types available in the system
@@ -48,6 +48,28 @@ interface NumberParameterType extends BaseParameterType {
 
 type ParameterType = SelectParameterType | TextParameterType | NumberParameterType;
 
+// Define report interface
+interface Report {
+  id: string;
+  name: string;
+  description: string;
+  report_type: string;
+  frequency: string;
+  recipient_emails: string[];
+  parameters: Record<string, unknown>;
+  created_at: string;
+  is_active: boolean;
+  next_run: string | null;
+  last_run: string | null;
+  last_execution?: {
+    status?: string;
+    report_url?: string;
+  };
+}
+
+// Define parameters record type
+type ParametersRecord = Record<string, string | number | boolean>;
+
 // Report parameter definitions by type
 const REPORT_PARAMETERS: Record<string, ParameterType[]> = {
   content_gaps: [
@@ -86,7 +108,7 @@ export default function ScheduledReports() {
   const user = useUser();
   
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [showNewReportForm, setShowNewReportForm] = useState(false);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -98,18 +120,11 @@ export default function ScheduledReports() {
     report_type: REPORT_TYPES[0].id,
     frequency: FREQUENCIES[0].id,
     recipient_emails: [''],
-    parameters: {}
+    parameters: {} as ParametersRecord
   });
   
-  // Fetch scheduled reports on component mount
-  useEffect(() => {
-    if (user) {
-      fetchReports();
-    }
-  }, [user]);
-  
   // Fetch reports from the database
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -124,7 +139,14 @@ export default function ScheduledReports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+  
+  // Fetch scheduled reports on component mount
+  useEffect(() => {
+    if (user) {
+      fetchReports();
+    }
+  }, [user, fetchReports]);
   
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -133,7 +155,7 @@ export default function ScheduledReports() {
   };
   
   // Handle parameter input changes
-  const handleParameterChange = (paramId: string, value: any) => {
+  const handleParameterChange = (paramId: string, value: string | number | boolean) => {
     setNewReport(prev => ({
       ...prev,
       parameters: {
@@ -208,7 +230,7 @@ export default function ScheduledReports() {
       }
       
       // Call RPC function to schedule the report
-      const { data, error } = await supabase.rpc('schedule_report', {
+      const { error } = await supabase.rpc('schedule_report', {
         p_name: newReport.name,
         p_description: newReport.description,
         p_report_type: newReport.report_type,
@@ -222,9 +244,9 @@ export default function ScheduledReports() {
       // Reset form and reload reports
       resetForm();
       fetchReports();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating report:', error);
-      setFormError(error.message || 'Failed to create report');
+      setFormError(error instanceof Error ? error.message : 'Failed to create report');
     } finally {
       setFormSubmitting(false);
     }
@@ -301,7 +323,7 @@ export default function ScheduledReports() {
               </label>
               <input
                 type="text"
-                value={value}
+                value={value as string}
                 onChange={(e) => handleParameterChange(param.id, e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md"
                 required={param.required}
@@ -317,7 +339,7 @@ export default function ScheduledReports() {
               </label>
               <input
                 type="number"
-                value={value}
+                value={value as number}
                 onChange={(e) => handleParameterChange(param.id, parseInt(e.target.value))}
                 className="w-full p-2 border border-gray-300 rounded-md"
                 required={param.required}
@@ -333,7 +355,7 @@ export default function ScheduledReports() {
                 {param.name} {param.required && <span className="text-red-500">*</span>}
               </label>
               <select
-                value={value}
+                value={value as string}
                 onChange={(e) => handleParameterChange(param.id, e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md bg-white"
                 required={param.required}

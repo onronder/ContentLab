@@ -13,9 +13,18 @@ const redis = new Redis({
   token: process.env.REDIS_TOKEN || '',
 });
 
+// Define interface for rate limit configuration
+interface RateLimitConfig {
+  effective_limit: number;
+  burst_capacity: number;
+  cooldown_seconds: number;
+  adaptive_enabled: boolean;
+  user_tier_multipliers?: Record<string, number>;
+}
+
 // Cache for rate limit configurations to avoid excessive DB queries
 const rateLimitConfigCache = new Map<string, {
-  config: any;
+  config: RateLimitConfig;
   expiresAt: number;
 }>();
 
@@ -25,7 +34,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 /**
  * Get rate limit configuration for an endpoint
  */
-async function getRateLimitConfig(endpoint: string): Promise<any> {
+async function getRateLimitConfig(endpoint: string): Promise<RateLimitConfig> {
   // Check cache first
   const cachedConfig = rateLimitConfigCache.get(endpoint);
   if (cachedConfig && cachedConfig.expiresAt > Date.now()) {
@@ -64,7 +73,7 @@ async function getRateLimitConfig(endpoint: string): Promise<any> {
  */
 async function getUserTierMultiplier(
   userId: string | undefined,
-  tierMultipliers: any
+  tierMultipliers: Record<string, number> | undefined
 ): Promise<number> {
   if (!userId) return 1; // Default multiplier for unauthenticated users
 
@@ -83,7 +92,7 @@ async function getUserTierMultiplier(
 
     // Get multiplier for this tier or default to 1
     const tier = userData.tier || 'free';
-    return parseFloat(tierMultipliers?.[tier] || 1);
+    return tierMultipliers?.[tier] !== undefined ? parseFloat(tierMultipliers[tier].toString()) : 1;
   } catch (error) {
     console.error('Error in getUserTierMultiplier:', error);
     return 1;
@@ -143,7 +152,7 @@ async function shouldRateLimit(
   endpoint: string,
   userId: string | undefined,
   clientIp: string | undefined,
-  config: any
+  config: RateLimitConfig
 ): Promise<{ isLimited: boolean; retryAfter: number }> {
   try {
     // Get user-specific limit based on their tier
@@ -167,7 +176,7 @@ async function shouldRateLimit(
     
     // If this is the first request in this window, set expiry
     if (count === 0 || ttl <= 0) {
-      await redis.setex(key, cooldownSeconds, 1);
+      await redis.setex(key, cooldownSeconds, '1');
       return { isLimited: false, retryAfter: 0 };
     }
     
