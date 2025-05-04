@@ -33,18 +33,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/autoscaling/route",
-      "schedule": "*/15 * * * *"
-    }
-  ],
   "build": {
     "env": {
       "NODE_OPTIONS": "--max_old_space_size=4096"
