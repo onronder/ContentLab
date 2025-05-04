@@ -135,7 +135,11 @@ class PoolManager {
    * @param type Pool type to use ('primary' or 'read_replica')
    * @returns Query result
    */
-  public async query(query: string, params: any[] = [], type: PoolType = 'primary'): Promise<any> {
+  public async query<T = unknown>(
+    query: string, 
+    params: unknown[] = [], 
+    type: PoolType = 'primary'
+  ): Promise<T> {
     // Default to primary for write operations
     const isWriteOperation = /^\s*(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)/i.test(query);
     
@@ -154,7 +158,7 @@ class PoolManager {
         console.warn(`Slow query (${duration}ms):`, query, params);
       }
       
-      return result;
+      return result as T;
     } finally {
       client.release();
     }

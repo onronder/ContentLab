@@ -123,7 +123,7 @@ export function UsageAnalytics() {
   const supabase = createClient();
   
   // Calculate actual date range based on selection
-  const getDateRange = () => {
+  const getDateRange = useCallback(() => {
     const today = new Date();
     switch (dateRange) {
       case '7days':
@@ -138,13 +138,13 @@ export function UsageAnalytics() {
           end: customEndDate || today 
         };
     }
-  };
+  }, [dateRange, customStartDate, customEndDate]);
   
   // Format the date range for display
-  const displayDateRange = () => {
+  const displayDateRange = useCallback(() => {
     const { start, end } = getDateRange();
     return formatDateRange(start, end);
-  };
+  }, [getDateRange]);
   
   // Fetch analytics data based on selected date range
   const fetchAnalytics = useCallback(async () => {

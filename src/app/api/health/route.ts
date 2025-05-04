@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRedisClient, checkRedisHealth } from '@/lib/redis';
+import { checkRedisHealth } from '@/lib/redis';
 import poolManager from '@/lib/db/pool-manager';
 import { CircuitBreaker } from '@/lib/circuit-breaker';
 
@@ -27,7 +27,11 @@ export async function GET() {
         primary: boolean;
         replica: boolean;
       };
-      circuits: Record<string, any>;
+      circuits: Record<string, { 
+        state: string; 
+        failures?: number;
+        error?: string;
+      }>;
     };
     uptime: number;
     responseTime: number;

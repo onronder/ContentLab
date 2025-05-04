@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRedisClient } from '@/lib/redis';
-import { createClient } from '@/lib/supabase/server';
-
-// Types for managing region scaling
-interface RegionStatus {
-  region: string;
-  traffic: number;
-  activeWorkers: number;
-  maxWorkers: number;
-  lastScaled: Date;
-}
+import { getRedisClient, checkRedisHealth } from '@/lib/redis';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 /**
  * Auto-scaling API endpoint run by cron job
@@ -18,15 +9,41 @@ interface RegionStatus {
  */
 export async function GET() {
   try {
-    // Ensure this only runs in a single region to prevent conflicts
-    const redis = getRedisClient();
-    const lock = await redis.set('lock:autoscaling', 'locked', {
-      nx: true,
-      ex: 60, // Lock expires after 60 seconds
-    });
+    // Check if Redis and Supabase are properly configured
+    const supabase = createServerSupabaseClient();
+    if (!supabase) {
+      console.error('Autoscaling failed: Supabase client not available');
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Autoscaling failed: Required services not configured' 
+      });
+    }
     
-    if (!lock) {
-      return NextResponse.json({ success: false, message: 'Another instance is already running' });
+    // Check Redis health first - if not available, log and continue with limited functionality
+    const redisAvailable = await checkRedisHealth();
+    if (!redisAvailable) {
+      console.warn('Redis not available for autoscaling. Proceeding with limited functionality.');
+      // Continue without distributed locking - in production, you might want to
+      // disable certain features when Redis is unavailable
+    }
+    
+    // Use Redis for distributed locking if available
+    let hasLock = true;
+    if (redisAvailable) {
+      const redis = getRedisClient();
+      const lock = await redis.set('lock:autoscaling', 'locked', {
+        nx: true,
+        ex: 60, // Lock expires after 60 seconds
+      });
+      
+      if (!lock) {
+        console.log('Autoscaling lock already acquired by another instance');
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Another instance is already running' 
+        });
+      }
+      hasLock = true;
     }
     
     // Fetch configuration
@@ -36,7 +53,6 @@ export async function GET() {
     const cooldownSeconds = parseInt(process.env.SCALING_COOLDOWN_SECONDS || '300');
     
     // Fetch current traffic data
-    const supabase = createClient();
     const { data: trafficData, error: trafficError } = await supabase
       .from('traffic_metrics')
       .select('region, request_count')
@@ -45,6 +61,11 @@ export async function GET() {
       
     if (trafficError) {
       console.error('Error fetching traffic data:', trafficError);
+      // Release the lock if we have one
+      if (redisAvailable && hasLock) {
+        const redis = getRedisClient();
+        await redis.del('lock:autoscaling');
+      }
       return NextResponse.json({ success: false, error: trafficError.message });
     }
     
@@ -55,6 +76,11 @@ export async function GET() {
       
     if (workerError) {
       console.error('Error fetching worker data:', workerError);
+      // Release the lock if we have one
+      if (redisAvailable && hasLock) {
+        const redis = getRedisClient();
+        await redis.del('lock:autoscaling');
+      }
       return NextResponse.json({ success: false, error: workerError.message });
     }
     
@@ -73,27 +99,32 @@ export async function GET() {
       
       if (!worker) {
         // Create worker record for this region if it doesn't exist
-        const { data: newWorker, error: createError } = await supabase
-          .from('worker_regions')
-          .insert({
-            region,
-            active_workers: minWorkersPerRegion,
-            max_workers: maxWorkersPerRegion,
-            last_scaled: new Date().toISOString()
-          })
-          .select()
-          .single();
+        try {
+          const { data: _newWorker, error: createError } = await supabase
+            .from('worker_regions')
+            .insert({
+              region,
+              active_workers: minWorkersPerRegion,
+              max_workers: maxWorkersPerRegion,
+              last_scaled: new Date().toISOString()
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error(`Error creating worker for region ${region}:`, createError);
+            continue;
+          }
           
-        if (createError) {
-          console.error(`Error creating worker for region ${region}:`, createError);
+          scalingActions.push({
+            region,
+            action: 'created',
+            workers: minWorkersPerRegion
+          });
+        } catch (err) {
+          console.error(`Failed to create worker record for region ${region}:`, err);
           continue;
         }
-        
-        scalingActions.push({
-          region,
-          action: 'created',
-          workers: minWorkersPerRegion
-        });
         
         continue;
       }
@@ -119,50 +150,59 @@ export async function GET() {
       const significantChange = Math.abs(idealWorkers - worker.active_workers) >= Math.max(1, worker.active_workers * 0.25);
       
       if (significantChange) {
-        // Update worker count
-        const { data: updatedWorker, error: updateError } = await supabase
-          .from('worker_regions')
-          .update({
-            active_workers: idealWorkers,
-            last_scaled: new Date().toISOString()
-          })
-          .eq('region', region)
-          .select()
-          .single();
+        try {
+          // Update worker count
+          const { data: _updatedWorker, error: updateError } = await supabase
+            .from('worker_regions')
+            .update({
+              active_workers: idealWorkers,
+              last_scaled: new Date().toISOString()
+            })
+            .eq('region', region)
+            .select()
+            .single();
+            
+          if (updateError) {
+            console.error(`Error updating workers for region ${region}:`, updateError);
+            continue;
+          }
           
-        if (updateError) {
-          console.error(`Error updating workers for region ${region}:`, updateError);
+          // Record the scaling action
+          await supabase
+            .from('autoscaling_history')
+            .insert({
+              region,
+              previous_workers: worker.active_workers,
+              new_workers: idealWorkers,
+              traffic: regionTraffic,
+              reason: idealWorkers > worker.active_workers ? 'scale_up' : 'scale_down'
+            });
+            
+          scalingActions.push({
+            region,
+            action: idealWorkers > worker.active_workers ? 'scaled_up' : 'scaled_down',
+            from: worker.active_workers,
+            to: idealWorkers,
+            traffic: regionTraffic
+          });
+        } catch (err) {
+          console.error(`Failed to update worker count for region ${region}:`, err);
           continue;
         }
-        
-        // Record the scaling action
-        await supabase
-          .from('autoscaling_history')
-          .insert({
-            region,
-            previous_workers: worker.active_workers,
-            new_workers: idealWorkers,
-            traffic: regionTraffic,
-            reason: idealWorkers > worker.active_workers ? 'scale_up' : 'scale_down'
-          });
-          
-        scalingActions.push({
-          region,
-          action: idealWorkers > worker.active_workers ? 'scaled_up' : 'scaled_down',
-          from: worker.active_workers,
-          to: idealWorkers,
-          traffic: regionTraffic
-        });
       }
     }
     
-    // Release the lock
-    await redis.del('lock:autoscaling');
+    // Release the lock if Redis is available
+    if (redisAvailable && hasLock) {
+      const redis = getRedisClient();
+      await redis.del('lock:autoscaling');
+    }
     
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      actions: scalingActions
+      actions: scalingActions,
+      redis_available: redisAvailable
     });
     
   } catch (error) {

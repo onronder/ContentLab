@@ -20,7 +20,7 @@ function getRegion(): string {
 
 // Function to record traffic asynchronously without blocking the response
 async function recordTraffic(
-  supabase: any,
+  supabase: ReturnType<typeof createClient>,
   request: NextRequest,
   region: string,
   requestStart: number

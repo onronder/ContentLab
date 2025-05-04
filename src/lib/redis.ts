@@ -2,17 +2,112 @@ import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
 
 // Create Redis client for distributed caching and rate limiting
-let redis: Redis;
-let rateLimiter: Record<string, Ratelimit>;
+let redis: Redis | null = null;
+let rateLimiter: Record<string, Ratelimit> = {};
+let redisEnabled = false;
 
-export function getRedisClient() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.REDIS_URL || '',
-      token: process.env.REDIS_TOKEN || '',
-    });
+// Create a minimal interface that matches the Redis methods we actually use
+interface MinimalRedisClient {
+  get(key: string): Promise<unknown>;
+  set(key: string, value: unknown, options?: { ex?: number, nx?: boolean }): Promise<string | null>;
+  incr(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+  del(key: string): Promise<number>;
+  keys(pattern: string): Promise<string[]>;
+  ping(): Promise<string>;
+}
+
+/**
+ * Checks if Redis is configured with required environment variables
+ */
+function isRedisConfigured(): boolean {
+  return !!(process.env.REDIS_URL && process.env.REDIS_TOKEN);
+}
+
+/**
+ * Gets the Redis client, or returns a fallback implementation if Redis is not configured
+ */
+export function getRedisClient(): Redis {
+  // Initialize the redisEnabled flag once
+  if (redis === null) {
+    redisEnabled = isRedisConfigured();
+    
+    if (redisEnabled) {
+      // Create real Redis client if configured
+      try {
+        redis = new Redis({
+          url: process.env.REDIS_URL || '',
+          token: process.env.REDIS_TOKEN || '',
+        });
+        console.log("Redis client initialized successfully");
+      } catch (error) {
+        console.error("Failed to initialize Redis client:", error);
+        redisEnabled = false;
+        redis = createFallbackRedis() as unknown as Redis;
+      }
+    } else {
+      console.warn("Redis is not configured. Using in-memory fallback implementation.");
+      redis = createFallbackRedis() as unknown as Redis;
+    }
   }
+  
   return redis;
+}
+
+/**
+ * Creates a fallback implementation when Redis is not available
+ * This prevents the application from crashing but won't be distributed
+ */
+function createFallbackRedis(): MinimalRedisClient {
+  // Simple in-memory store
+  const store: Record<string, { value: unknown, expiry: number | null }> = {};
+  
+  // Return a minimal implementation of the Redis interface
+  return {
+    get: async (key: string) => {
+      const item = store[key];
+      if (!item) return null;
+      
+      // Check if expired
+      if (item.expiry && item.expiry < Date.now()) {
+        delete store[key];
+        return null;
+      }
+      
+      return item.value;
+    },
+    set: async (key: string, value: unknown, options?: { ex?: number, nx?: boolean }) => {
+      // Check if key exists and nx option is true
+      if (options?.nx && store[key]) {
+        return null;
+      }
+      
+      const expiry = options?.ex ? Date.now() + (options.ex * 1000) : null;
+      store[key] = { value, expiry };
+      return 'OK';
+    },
+    incr: async (key: string) => {
+      const current = store[key]?.value || 0;
+      const newValue = typeof current === 'number' ? current + 1 : 1;
+      store[key] = { value: newValue, expiry: store[key]?.expiry || null };
+      return newValue;
+    },
+    expire: async (key: string, seconds: number) => {
+      if (!store[key]) return 0;
+      store[key].expiry = Date.now() + (seconds * 1000);
+      return 1;
+    },
+    del: async (key: string) => {
+      if (!store[key]) return 0;
+      delete store[key];
+      return 1;
+    },
+    keys: async (pattern: string) => {
+      const regex = new RegExp(pattern.replace('*', '.*'));
+      return Object.keys(store).filter(key => regex.test(key));
+    },
+    ping: async () => 'PONG'
+  };
 }
 
 /**
@@ -21,10 +116,6 @@ export function getRedisClient() {
  * @returns RateLimiter instance
  */
 export function getRateLimiter(planType: 'free' | 'starter' | 'pro' | 'enterprise' | 'custom') {
-  if (!rateLimiter) {
-    rateLimiter = {};
-  }
-
   if (!rateLimiter[planType]) {
     // Configure rate limits based on plan
     const limits = {
@@ -36,12 +127,20 @@ export function getRateLimiter(planType: 'free' | 'starter' | 'pro' | 'enterpris
     };
 
     // Create the rate limiter using the Upstash sliding window algorithm
-    rateLimiter[planType] = new Ratelimit({
-      redis: getRedisClient(),
-      limiter: Ratelimit.slidingWindow(limits[planType].requests, `${limits[planType].per} s`),
-      analytics: true,
-      prefix: `ratelimit:${planType}`,
-    });
+    try {
+      rateLimiter[planType] = new Ratelimit({
+        redis: getRedisClient(),
+        limiter: Ratelimit.slidingWindow(limits[planType].requests, `${limits[planType].per} s`),
+        analytics: redisEnabled, // Only enable analytics if real Redis is used
+        prefix: `ratelimit:${planType}`,
+      });
+    } catch (error) {
+      console.error(`Failed to create rate limiter for ${planType}:`, error);
+      // Return a dummy rate limiter that always allows requests
+      rateLimiter[planType] = {
+        limit: async () => ({ success: true, remaining: 1000, limit: 1000, reset: Date.now() + 60000 })
+      } as any;
+    }
   }
 
   return rateLimiter[planType];
@@ -142,6 +241,11 @@ export async function recordRateLimitHit(
  * @returns Boolean indicating if Redis is healthy
  */
 export async function checkRedisHealth(): Promise<boolean> {
+  if (!redisEnabled) {
+    console.warn("Redis health check: Redis is not configured");
+    return false;
+  }
+  
   try {
     const client = getRedisClient();
     const pong = await client.ping();

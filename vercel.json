@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "npx pnpm install --no-frozen-lockfile && npx pnpm build",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1", "sfo1", "lhr1", "sin1"],
@@ -44,7 +44,7 @@
   },
   "crons": [
     {
-      "path": "/api/cron/autoscaling",
+      "path": "/api/cron/autoscaling/route",
       "schedule": "*/15 * * * *"
     }
   ]
