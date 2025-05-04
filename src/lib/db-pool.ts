@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // Configure connection pool settings
 const poolConfig = {
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client can remain idle before being closed
+  max: process.env.NODE_ENV === 'production' ? 5 : 20, // Lower max connections in production
+  idleTimeoutMillis: 10000, // Reduce idle timeout for Vercel environment
   connectionTimeoutMillis: 5000, // How long to wait for a connection
   // Database connection details come from environment variables
   host: process.env.POSTGRES_HOST || 'localhost',
@@ -40,6 +40,18 @@ class DBPool {
       // Set up cleanup function for graceful shutdown
       process.on('SIGTERM', () => DBPool.cleanup());
       process.on('SIGINT', () => DBPool.cleanup());
+      
+      // Add build-time cleanup for Vercel
+      if (typeof process.env.NEXT_PHASE === 'string' && 
+         (process.env.NEXT_PHASE === 'phase-production-build' || 
+          process.env.NEXT_PHASE === 'phase-export')) {
+        console.log('Registered automatic pool cleanup for build process');
+        // This ensures the pool is cleaned up after static generation
+        process.on('beforeExit', () => {
+          console.log('Build process exiting, cleaning up pool');
+          DBPool.cleanup();
+        });
+      }
       
       DBPool.isInitialized = true;
     }
