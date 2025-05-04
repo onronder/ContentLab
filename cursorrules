@@ -1,0 +1,161 @@
+# ContentCreate-main Project Cursor Rules
+# High-standard, production-grade, bug-free development configuration
+
+# Language and Framework Rules
+language:
+  typescript:
+    strict: true
+    noImplicitAny: true
+    strictNullChecks: true
+    noUnusedLocals: true
+    noUnusedParameters: true
+  react:
+    hooksExhaustiveDeps: true
+    noUnescapedEntities: true
+
+# Component Structure Rules
+component:
+  maxLines: 300
+  requirePropTypes: true
+  prefersArrowFunctions: true
+  prefersNamedExports: true
+  requireReturnTypes: true
+
+# Import/Export Rules
+imports:
+  grouping:
+    - pattern: "^react"
+      group: "react"
+    - pattern: "^next"
+      group: "next"
+    - pattern: "^@/"
+      group: "project"
+    - pattern: "^[./]"
+      group: "relative"
+  ordering:
+    - group: "react"
+    - group: "next"
+    - group: "project"
+    - group: "relative"
+  maxDependencies: 20
+  noUnusedImports: true
+  noRelativePaths: ['../../']
+
+# Code Style Rules
+style:
+  maxLineLength: 100
+  indentation: 2
+  prefersSingleQuotes: true
+  requiresSemicolons: true
+  trailingComma: "es5"
+  noConsole: true
+  noAlert: true
+  noDebugger: true
+
+# Performance Rules
+performance:
+  noUnnecessaryRenders: true
+  preferMemo: true
+  preferUseCallback: true
+  preferUseId: true
+  noRedundantState: true
+  noUnnecessaryDependencies: true
+
+# Security Rules
+security:
+  noDangerouslySetInnerHTML: true
+  noEval: true
+  noInlineEventHandlers: true
+  noInlineStyles: true
+  requireContentSecurityPolicy: true
+  noHardcodedSecrets: true
+
+# Accessibility Rules
+accessibility:
+  requireAltText: true
+  requireAriaLabels: true
+  requireAriaRoles: true
+  requireSemanticElements: true
+  requireHeadingHierarchy: true
+
+# Database Rules
+database:
+  requireParameterizedQueries: true
+  noRawSqlQueries: true
+  requireConnectionPooling: true
+  requireTransactions: true
+  requireErrorHandling: true
+
+# API Rules
+api:
+  requireValidation: true
+  requireErrorHandling: true
+  requireRateLimiting: true
+  maxComplexity: 10
+  requireDocumentation: true
+
+# Testing Rules
+testing:
+  requireUnitTests: true
+  requireIntegrationTests: true
+  requireCoverage: 80
+  requireTestsForNewFeatures: true
+  noSkippedTests: true
+  requireMocks: true
+
+# Documentation Rules
+documentation:
+  requireJsDoc: true
+  requireReadme: true
+  requireChangeLog: true
+  requireComponentDoc: true
+  requireApiDoc: true
+
+# File Structure Rules
+fileStructure:
+  maxFileSize: 500
+  requireIndex: true
+  requireConsistentNaming: true
+  folderStructure: [
+    "app/",
+    "components/",
+    "hooks/",
+    "lib/",
+    "middleware/",
+    "utils/",
+    "types/",
+    "tests/"
+  ]
+
+# Git Rules
+git:
+  requireCleanCommits: true
+  requireConventionalCommits: true
+  noMergeConflicts: true
+  requireBranchingStrategy: true
+  maxChangesPerCommit: 300
+
+# CI/CD Rules
+cicd:
+  requireLintCheck: true
+  requireTypeCheck: true
+  requireUnitTests: true
+  requireE2ETests: true
+  requireBuildCheck: true
+  requireDeployPreview: true
+
+# Monitoring Rules
+monitoring:
+  requireErrorLogging: true
+  requirePerformanceMonitoring: true
+  requireUserActivityTracking: true
+  requireAccessLogging: true
+  requireHealthChecks: true
+
+# Autoscaling Rules
+scaling:
+  requireConnectionPooling: true
+  requireRateLimiting: true
+  requireCaching: true
+  requireLoadBalancing: true
+  requireCircuitBreakers: true

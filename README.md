@@ -2,6 +2,22 @@
 
 A tool for analyzing content against competitors to find gaps and popular themes.
 
+## Features
+
+### Authentication System
+- Supabase Auth integration for secure user management
+- Sign in, sign up, and password reset flows
+- Support for social logins (Google, GitHub, Azure)
+- Responsive authentication pages with consistent styling
+
+### Dashboard Interface
+- Personalized dashboard with user greeting
+- Overview of content metrics and stats
+- Activity feed showing recent actions
+- Usage quota visualization
+- Quick actions for common tasks
+- Responsive sidebar navigation for dashboard sections
+
 ## Deployment on Vercel
 
 This project is configured for easy deployment on Vercel with GitHub integration.
@@ -63,6 +79,23 @@ npm install
 # Run development server
 npm run dev
 ```
+
+## UI Components
+
+The project uses a comprehensive UI component library built with:
+
+- Tailwind CSS for styling
+- Shadcn UI components
+- Responsive design principles
+- Light and dark theme support
+
+Main component categories:
+- Authentication components
+- Dashboard components
+- Data visualization
+- Form elements
+- Navigation
+- Feedback (toasts, alerts)
 
 ## License
 
