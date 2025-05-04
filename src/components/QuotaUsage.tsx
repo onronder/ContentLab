@@ -19,11 +19,15 @@ interface QuotaUsageProps {
 
 interface QuotaRequest {
   id: string;
-  created_at: string;
-  request_type: 'analyses' | 'competitors' | 'api_requests' | 'storage';
+  request_type: string;
   current_limit: number;
   requested_limit: number;
-  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  status: string;
+  created_at: string;
+  requested_by: { email: string };
+  reviewed_by: { email: string } | null;
+  reviewed_at: string | null;
 }
 
 export function QuotaUsage({ organizationId }: QuotaUsageProps) {

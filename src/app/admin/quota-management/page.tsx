@@ -23,6 +23,26 @@ interface FormattedQuotaRequest {
   reviewedAt: string | null;
 }
 
+// Define the type for the raw quota request from the database
+interface RawQuotaRequest {
+  id: string;
+  organization_id: string;
+  organizations?: { name?: string };
+  requested_by: string;
+  auth?: {
+    users_quota_increase_requests_requested_by_fkey?: { email?: string };
+    users_quota_increase_requests_reviewed_by_fkey?: { email?: string };
+  };
+  request_type: string;
+  current_limit: number;
+  requested_limit: number;
+  reason: string;
+  status: string;
+  created_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+}
+
 export default async function QuotaManagementPage() {
   const supabase = createServerSupabaseClient();
   
@@ -52,8 +72,11 @@ export default async function QuotaManagementPage() {
   
   if (requests) {
     // Handle each request safely with appropriate type checks
-    requests.forEach((request) => {
+    requests.forEach((rawRequest) => {
       try {
+        // Type assertion to help TypeScript understand the structure
+        const request = rawRequest as unknown as RawQuotaRequest;
+        
         // Safely extract properties with type checking
         const id = typeof request.id === 'string' ? request.id : '';
         const organization_id = typeof request.organization_id === 'string' ? request.organization_id : '';
