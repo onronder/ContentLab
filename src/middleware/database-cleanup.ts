@@ -1,5 +1,4 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { dbPool } from '@/lib/db-pool';
 
 /**
  * This middleware ensures that database connections are
