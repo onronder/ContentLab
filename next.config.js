@@ -1,51 +1,31 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    // Ignore ESLint during builds
-    ignoreDuringBuilds: true,
-  },
+
+  // External image domains
   images: {
     domains: [
-      // Add any external image domains you might use
       'images.unsplash.com',
-      'avatars.githubusercontent.com'
+      'avatars.githubusercontent.com',
     ],
   },
+
+  // Global security‑related response headers
   async headers() {
     return [
       {
-        // Apply these headers to all routes
         source: '/:path*',
         headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
-          },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
           {
             key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload'
-          }
+            value:
+              'max-age=63072000; includeSubDomains; preload',
+          },
         ],
       },
-    ]
+    ];
   },
-  // Ensure API routes work correctly with Supabase Auth
-  async rewrites() {
-    return [
-      {
-        source: '/api/auth/:path*',
-        destination: '/api/auth/:path*',
-      }
-    ]
-  }
-}
+};
 
-module.exports = nextConfig 
+module.exports = nextConfig;

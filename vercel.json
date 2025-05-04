@@ -1,9 +1,6 @@
 {
-  "buildCommand": "npx pnpm install --no-frozen-lockfile && npx pnpm build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "regions": ["iad1", "sfo1", "lhr1", "sin1"],
   "version": 2,
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/(.*)",
@@ -48,8 +45,12 @@
       "schedule": "*/15 * * * *"
     }
   ],
+  "build": {
+    "env": {
+      "NODE_OPTIONS": "--max_old_space_size=4096"
+    }
+  },
   "env": {
-    "NODE_OPTIONS": "--max_old_space_size=4096",
     "NEXT_TELEMETRY_DISABLED": "1"
   }
-} 
+}
