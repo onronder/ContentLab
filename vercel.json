@@ -36,14 +36,14 @@
     }
   ],
   "functions": {
-    "api/**/*.ts": {
+    "api/cron/**/*.ts": {
       "memory": 1024,
       "maxDuration": 30
     }
   },
   "crons": [
     {
-      "path": "app/api/**/*.ts",
+      "path": "/api/cron/autoscaling",
       "schedule": "*/15 * * * *"
     }
   ],
